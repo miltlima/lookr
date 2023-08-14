@@ -21,7 +21,6 @@ go build -o lookr cmd/lookr/main.go
 
 The `lookr` CLI provides the following commands to query information about various AWS services:
 
-- `regions`: List available AWS regions.
 - `ec2`: Query information about EC2 instances.
 - `s3`: Query information about Amazon S3 buckets.
 - `rds`: Query information about RDS databases.
