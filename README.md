@@ -22,7 +22,6 @@ go build -o lookr cmd/lookr/main.go
 The `lookr` CLI provides the following commands to query information about various AWS services:
 
 - `ec2`: Query information about EC2 instances.
-- `s3`: Query information about Amazon S3 buckets.
 - `rds`: Query information about RDS databases.
 - `sqs`: Query information about Amazon SQS queues.
 - `lambda`: Query information about AWS Lambda functions.

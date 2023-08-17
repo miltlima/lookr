@@ -24,7 +24,6 @@ func main() {
 		cmd.LambdaCmd,
 		cmd.RdsCmd,
 		cmd.Route53Cmd,
-		cmd.S3Cmd,
 		cmd.SqsCmd,
 	)
 	if err := rootCmd.Execute(); err != nil {
