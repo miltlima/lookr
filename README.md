@@ -17,6 +17,12 @@ go build -o lookr cmd/lookr/main.go
 
 5. Now you can run the CLI using `./lookr`.
 
+or Move the executable to a folder that is in your system's PATH:
+
+```bash
+sudo mv goact /usr/local/bin
+```
+
 ## Commands
 
 The `lookr` CLI provides the following commands to query information about various AWS services:
@@ -44,7 +50,7 @@ Replace <command> with the desired service name. For example, to query informati
 
 ```shell
 ./lookr ec2
-``````
+```
 
 The CLI will display the results in a tabular format, showing details about the service in the current region and other configured regions.
 
