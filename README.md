@@ -1,3 +1,5 @@
+[!["Buy Me A Coffee"](https://img.shields.io/badge/Buy_Me_A_Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/miltlima)
+
 # lookr - A Aws CLI
 
 The `lookr` CLI is a tool that allows you to query information about various Amazon Web Services (AWS) services across different regions. It leverages the official AWS SDK for Go to interact with these services and presents the results in a tabular format.
