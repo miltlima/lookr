@@ -24,7 +24,7 @@ func init() {
 
 func queryEBS(cmd *cobra.Command, args []string) {
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Volume ID", "Region", "az", "Size (GB)", "Type", "Status", "IOPS", "Encryption", "arn"})
+	table.SetHeader([]string{"Volume ID", "Region", "az", "Size (GB)", "Type", "Status", "IOPS", "Encryption"})
 
 	AuthRegions := deps.AuthRegions()
 	for _, region := range AuthRegions {
@@ -69,7 +69,6 @@ func queryEBS(cmd *cobra.Command, args []string) {
 				*volume.State,
 				iops,
 				encryption,
-				*volume.OutpostArn,
 			}
 			table.Append(row)
 		}

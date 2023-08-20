@@ -55,6 +55,11 @@ func queryAurora(cmd *cobra.Command, args []string) {
 				dbInstances += *instance.DBInstanceIdentifier + ", "
 			}
 
+			replicaIdentifier := ""
+			if len(cluster.ReadReplicaIdentifiers) > 0 {
+				replicaIdentifier = *cluster.ReadReplicaIdentifiers[0]
+			}
+
 			row := []string{
 				*cluster.DBClusterIdentifier,
 				regionName,
@@ -62,7 +67,7 @@ func queryAurora(cmd *cobra.Command, args []string) {
 				*cluster.Engine,
 				*cluster.EngineVersion,
 				dbInstances,
-				*cluster.ReadReplicaIdentifiers[0],
+				replicaIdentifier,
 				*cluster.DBClusterArn,
 			}
 			table.Append(row)
