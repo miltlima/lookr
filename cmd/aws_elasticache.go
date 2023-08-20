@@ -24,7 +24,7 @@ func init() {
 
 func queryElastiCache(cmd *cobra.Command, args []string) {
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Cluster ID", "Region", "Engine", "Status", "Node Type", "Num Cache Nodes", "ARN"})
+	table.SetHeader([]string{"Cluster ID", "Region", "Engine", "Engine Version", "Status", "Node Type", "Nodes", "ARN"})
 
 	AuthRegions := deps.AuthRegions()
 	for _, region := range AuthRegions {
@@ -54,6 +54,7 @@ func queryElastiCache(cmd *cobra.Command, args []string) {
 				*cluster.CacheClusterId,
 				regionName,
 				*cluster.Engine,
+				*cluster.EngineVersion,
 				*cluster.CacheClusterStatus,
 				*cluster.CacheNodeType,
 				fmt.Sprintf("%d", *cluster.NumCacheNodes),
