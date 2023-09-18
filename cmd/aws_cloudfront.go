@@ -24,7 +24,7 @@ func init() {
 
 func queryCloudFront(cmd *cobra.Command, args []string) {
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Distribution ID", "Region", "Domain Name", "Status", "Default Cache Behavior"})
+	table.SetHeader([]string{"Distribution ID", "Region", "Domain Name", "Status", "Default Cache Behavior", "arn"})
 
 	AuthRegions := deps.AuthRegions()
 	for _, region := range AuthRegions {

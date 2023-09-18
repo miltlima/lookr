@@ -24,7 +24,7 @@ func init() {
 
 func queryDynamoDB(cmd *cobra.Command, args []string) {
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Table Name", "Region", "Status", "Item Count", "Size (Bytes)", "Provisioned Throughput"})
+	table.SetHeader([]string{"Table Name", "Region", "Status", "Item Count", "Size (Bytes)", "Provisioned Throughput", "arn"})
 
 	AuthRegions := deps.AuthRegions()
 	for _, region := range AuthRegions {
@@ -74,6 +74,7 @@ func queryDynamoDB(cmd *cobra.Command, args []string) {
 				fmt.Sprintf("%d", *tableDetails.Table.ItemCount),
 				fmt.Sprintf("%d", *tableDetails.Table.TableSizeBytes),
 				provisionedThroughput,
+				*tableDetails.Table.TableArn,
 			}
 			table.Append(row)
 		}
