@@ -24,7 +24,7 @@ func init() {
 
 func queryIAM(cmd *cobra.Command, args []string) {
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"Name", "Type", "Region", "Creation Time"})
+	table.SetHeader([]string{"Name", "Type", "Region", "Creation Time", "arn"})
 
 	AuthRegions := deps.AuthRegions()
 	for _, region := range AuthRegions {
