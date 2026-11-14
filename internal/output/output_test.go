@@ -3,6 +3,7 @@ package output
 import (
 	"bytes"
 	"encoding/csv"
+	"errors"
 	"flag"
 	"os"
 	"path/filepath"
@@ -148,5 +149,33 @@ func TestWriteTableEmpty(t *testing.T) {
 	}
 	if !strings.Contains(out, "(0%)") {
 		t.Errorf("expected 0%% waste share:\n%s", out)
+	}
+}
+
+// failAfter accepts n bytes in total and then fails every write.
+type failAfter struct{ n int }
+
+func (f *failAfter) Write(p []byte) (int, error) {
+	if len(p) > f.n {
+		n := f.n
+		f.n = 0
+		return n, errors.New("write failed")
+	}
+	f.n -= len(p)
+	return len(p), nil
+}
+
+func TestWriteTablePropagatesWriteErrors(t *testing.T) {
+	r := sampleReport()
+	var full bytes.Buffer
+	if err := WriteTable(&full, r); err != nil {
+		t.Fatal(err)
+	}
+	// Every cut point, from inside the header to inside the FINDINGS block,
+	// must surface the error.
+	for n := 0; n < full.Len(); n++ {
+		if err := WriteTable(&failAfter{n: n}, r); err == nil {
+			t.Fatalf("no error when writer fails after %d of %d bytes", n, full.Len())
+		}
 	}
 }

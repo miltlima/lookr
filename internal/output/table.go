@@ -14,7 +14,8 @@ import (
 const maxCell = 40
 
 // WriteTable writes a summary, the resource table and the findings list.
-func WriteTable(w io.Writer, r model.Report) error {
+func WriteTable(out io.Writer, r model.Report) error {
+	w := &errWriter{w: out}
 	s := r.Summary
 	pct := 0
 	if s.MonthlyUSD > 0 {
@@ -32,8 +33,8 @@ func WriteTable(w io.Writer, r model.Report) error {
 	fmt.Fprintln(w)
 
 	if len(r.Resources) == 0 {
-		_, err := fmt.Fprintln(w, "No resources found.")
-		return err
+		fmt.Fprintln(w, "No resources found.")
+		return w.err
 	}
 
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
@@ -47,10 +48,24 @@ func WriteTable(w io.Writer, r model.Report) error {
 			res.Short, truncate(resourceLabel(res)), res.Region, res.Usage.Verdict,
 			truncate(res.Usage.Reason), costLabel(res.Cost), issues)
 	}
-	if err := tw.Flush(); err != nil {
-		return err
+	tw.Flush()
+	writeFindings(w, r.Resources)
+	return w.err
+}
+
+// errWriter remembers the first write error and drops later writes.
+type errWriter struct {
+	w   io.Writer
+	err error
+}
+
+func (e *errWriter) Write(p []byte) (int, error) {
+	if e.err != nil {
+		return 0, e.err
 	}
-	return writeFindings(w, r.Resources)
+	n, err := e.w.Write(p)
+	e.err = err
+	return n, err
 }
 
 type findingRow struct {
@@ -58,7 +73,7 @@ type findingRow struct {
 	f   model.Finding
 }
 
-func writeFindings(w io.Writer, resources []model.Resource) error {
+func writeFindings(w io.Writer, resources []model.Resource) {
 	var rows []findingRow
 	for _, res := range resources {
 		for _, f := range res.Findings {
@@ -66,7 +81,7 @@ func writeFindings(w io.Writer, resources []model.Resource) error {
 		}
 	}
 	if len(rows) == 0 {
-		return nil
+		return
 	}
 	sort.SliceStable(rows, func(i, j int) bool {
 		return severityRank(rows[i].f.Severity) < severityRank(rows[j].f.Severity)
@@ -86,7 +101,6 @@ func writeFindings(w io.Writer, resources []model.Resource) error {
 			fmt.Fprintf(w, "        -> %s\n", row.f.Recommendation)
 		}
 	}
-	return nil
 }
 
 func severityRank(s model.Severity) int {
