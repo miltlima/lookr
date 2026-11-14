@@ -1,0 +1,192 @@
+{
+  "schema_version": "1",
+  "generated_at": "2026-11-14T12:00:00Z",
+  "provider": "aws",
+  "account_id": "123456789012",
+  "window_days": 30,
+  "regions": [
+    "us-east-1"
+  ],
+  "summary": {
+    "resources": 5,
+    "monthly_usd": 339.72,
+    "waste_resources": 2,
+    "waste_monthly_usd": 141.32,
+    "by_verdict": {
+      "idle": 1,
+      "in_use": 1,
+      "not_evaluated": 1,
+      "orphan": 1,
+      "unknown": 1
+    },
+    "findings_by_severity": {
+      "high": 1,
+      "low": 0,
+      "medium": 1
+    }
+  },
+  "resources": [
+    {
+      "provider": "aws",
+      "account_id": "123456789012",
+      "region": "us-east-1",
+      "type": "aws.ebs.volume",
+      "id": "vol-0a1b2c3d",
+      "arn": "arn:aws:ec2:us-east-1:123456789012:volume/vol-0a1b2c3d",
+      "name": "",
+      "tags": {
+        "env": "dev"
+      },
+      "created_at": "2025-03-09T14:30:00Z",
+      "config": {
+        "size_gb": 800,
+        "state": "available",
+        "volume_type": "gp3"
+      },
+      "usage": {
+        "verdict": "orphan",
+        "reason": "not attached to any instance",
+        "window_days": 30,
+        "metrics": {}
+      },
+      "cost": {
+        "monthly_usd": 80,
+        "source": "estimate",
+        "note": "storage only"
+      },
+      "findings": [
+        {
+          "check": "ebs.unencrypted",
+          "severity": "medium",
+          "message": "volume is not encrypted",
+          "recommendation": "Snapshot and recreate the volume with encryption enabled"
+        }
+      ]
+    },
+    {
+      "provider": "aws",
+      "account_id": "123456789012",
+      "region": "us-east-1",
+      "type": "aws.ec2.instance",
+      "id": "i-04f2",
+      "arn": "",
+      "name": "api-2",
+      "tags": {},
+      "created_at": null,
+      "config": {
+        "instance_type": "t3.large",
+        "security_groups": [
+          "sg-1"
+        ],
+        "state": "running"
+      },
+      "usage": {
+        "verdict": "idle",
+        "reason": "avg CPU 0.8% over 30d",
+        "window_days": 30,
+        "metrics": {
+          "cpu_avg": 0.8
+        }
+      },
+      "cost": {
+        "monthly_usd": 61.32,
+        "source": "actual",
+        "note": ""
+      },
+      "findings": []
+    },
+    {
+      "provider": "aws",
+      "account_id": "123456789012",
+      "region": "us-east-1",
+      "type": "aws.sqs.queue",
+      "id": "q-1",
+      "arn": "",
+      "name": "a,\"b\"",
+      "tags": {
+        "note": "line1\nline2"
+      },
+      "created_at": null,
+      "config": {
+        "fifo": false
+      },
+      "usage": {
+        "verdict": "unknown",
+        "reason": "no metrics",
+        "window_days": 30,
+        "metrics": {}
+      },
+      "cost": {
+        "monthly_usd": 0,
+        "source": "estimate",
+        "note": ""
+      },
+      "findings": []
+    },
+    {
+      "provider": "aws",
+      "account_id": "123456789012",
+      "region": "us-east-1",
+      "type": "aws.rds.instance",
+      "id": "db-homolog",
+      "arn": "",
+      "name": "db-homolog",
+      "tags": {},
+      "created_at": null,
+      "config": {
+        "engine": "postgres",
+        "publicly_accessible": true
+      },
+      "usage": {
+        "verdict": "in_use",
+        "reason": "max 14 connections",
+        "window_days": 30,
+        "metrics": {}
+      },
+      "cost": {
+        "monthly_usd": 198.4,
+        "source": "estimate",
+        "note": ""
+      },
+      "findings": [
+        {
+          "check": "rds.public",
+          "severity": "high",
+          "message": "database is publicly accessible",
+          "recommendation": "Disable public accessibility or restrict the security group to known addresses"
+        }
+      ]
+    },
+    {
+      "provider": "aws",
+      "account_id": "123456789012",
+      "region": "global",
+      "type": "aws.iam.role",
+      "id": "deploy-role",
+      "arn": "",
+      "name": "deploy-role",
+      "tags": {},
+      "created_at": null,
+      "config": {},
+      "usage": {
+        "verdict": "not_evaluated",
+        "reason": "inventory only",
+        "window_days": 0,
+        "metrics": {}
+      },
+      "cost": {
+        "monthly_usd": null,
+        "source": "none",
+        "note": ""
+      },
+      "findings": []
+    }
+  ],
+  "warnings": [
+    {
+      "region": "eu-west-1",
+      "type": "aws.eks.cluster",
+      "error": "AccessDenied"
+    }
+  ]
+}
