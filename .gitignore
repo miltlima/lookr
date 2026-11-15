@@ -23,3 +23,6 @@ go.work
 # Vscode workspace file and directory
 .vscode
 dist/
+
+# macOS
+.DS_Store

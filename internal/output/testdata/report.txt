@@ -1,0 +1,17 @@
+Account 123456789012 · 1 region · 5 resources · $339.72/mo
+Idle or orphan: 2 resources · $141.32/mo (42%)
+Findings: 1 high · 1 medium · 0 low
+Warnings: 1 (see stderr)
+
+TYPE  RESOURCE        REGION     VERDICT        REASON                        COST/MO          ISSUES
+ebs   vol-0a1b2c3d    us-east-1  orphan         not attached to any instance  $80.00 (est.)    1
+ec2   i-04f2 (api-2)  us-east-1  idle           avg CPU 0.8% over 30d         $61.32 (actual)  -
+sqs   q-1 (a,"b")     us-east-1  unknown        no metrics                    $0.00 (est.)     -
+rds   db-homolog      us-east-1  in_use         max 14 connections            $198.40 (est.)   1
+iam   deploy-role     global     not_evaluated  inventory only                -                -
+
+FINDINGS
+HIGH    rds  db-homolog    us-east-1  database is publicly accessible
+        -> Disable public accessibility or restrict the security group to known addresses
+MEDIUM  ebs  vol-0a1b2c3d  us-east-1  volume is not encrypted
+        -> Snapshot and recreate the volume with encryption enabled
