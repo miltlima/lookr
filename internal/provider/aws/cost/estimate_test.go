@@ -148,3 +148,14 @@ func TestEstimateLoadBalancerHourlyProduct(t *testing.T) {
 		}
 	}
 }
+
+func TestEstimateMatchesDatabaseEdition(t *testing.T) {
+	for engine, edition := range map[string]string{"sqlserver-ee": "Enterprise", "sqlserver-se": "Standard", "sqlserver-ex": "Express", "sqlserver-web": "Web", "oracle-ee": "Enterprise", "oracle-se2": "Standard Two"} {
+		r := model.Resource{Type: "aws.rds.instance", Region: "us-east-1", Config: map[string]any{"engine": engine, "instance_class": "db.m5.large"}}
+		p := &fakePrices{}
+		Estimate(context.Background(), &r, nil, 30, p)
+		if len(p.queries) != 1 || p.queries[0].Filters["databaseEdition"] != edition {
+			t.Fatalf("%s selects incompatible edition: %+v", engine, p.queries)
+		}
+	}
+}

@@ -95,7 +95,11 @@ func Estimate(ctx context.Context, r *model.Resource, m usage.Metrics, days int,
 		if r.Bool("multi_az") {
 			deployment = "Multi-AZ"
 		}
-		value = price("AmazonRDS", region, map[string]string{"productFamily": "Database Instance", "instanceType": r.Str("instance_class"), "databaseEngine": engine, "deploymentOption": deployment}) * HoursPerMonth
+		filters := map[string]string{"productFamily": "Database Instance", "instanceType": r.Str("instance_class"), "databaseEngine": engine, "deploymentOption": deployment}
+		if edition := databaseEdition(r.Str("engine")); edition != "" {
+			filters["databaseEdition"] = edition
+		}
+		value = price("AmazonRDS", region, filters) * HoursPerMonth
 		if r.Str("cluster_id") == "" && r.Float("allocated_storage_gb") > 0 {
 			storage := map[string]string{"gp2": "General Purpose", "gp3": "General Purpose-GP3", "io1": "Provisioned IOPS", "io2": "Provisioned IOPS-IO2", "standard": "Magnetic"}[r.Str("storage_type")]
 			if storage == "" {
@@ -199,6 +203,27 @@ func databaseEngine(engine string) string {
 		if strings.HasPrefix(engine, "oracle-") {
 			return "Oracle"
 		}
+		return ""
+	}
+}
+
+func databaseEdition(engine string) string {
+	switch engine {
+	case "sqlserver-ee", "oracle-ee", "oracle-ee-cdb":
+		return "Enterprise"
+	case "sqlserver-se":
+		return "Standard"
+	case "sqlserver-ex":
+		return "Express"
+	case "sqlserver-web":
+		return "Web"
+	case "oracle-se2", "oracle-se2-cdb":
+		return "Standard Two"
+	case "oracle-se1":
+		return "Standard One"
+	case "oracle-se":
+		return "Standard"
+	default:
 		return ""
 	}
 }
