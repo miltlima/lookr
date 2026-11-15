@@ -15,16 +15,30 @@ type bucketFake struct {
 	regions []string
 	deny    bool
 	missing bool
+	inputs  []*s3.ListBucketsInput
 	block   types.PublicAccessBlockConfiguration
 }
 
 func (f *bucketFake) ListBuckets(_ context.Context, in *s3.ListBucketsInput, _ ...func(*s3.Options)) (*s3.ListBucketsOutput, error) {
+	copy := *in
+	f.inputs = append(f.inputs, &copy)
 	f.calls++
 	o := &s3.ListBucketsOutput{Buckets: []types.Bucket{{Name: aws.String("bucket")}}}
 	if f.calls == 1 {
 		o.ContinuationToken = aws.String("next")
 	}
 	return o, nil
+}
+
+func TestBucketPaginationRequest(t *testing.T) {
+	f := &bucketFake{}
+	_, err := collectBuckets(context.Background(), f, func(string) bucketRegionAPI { return f }, Scope{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(f.inputs) != 2 || aws.ToInt32(f.inputs[0].MaxBuckets) <= 0 || aws.ToString(f.inputs[0].ContinuationToken) != "" || aws.ToString(f.inputs[1].ContinuationToken) != "next" {
+		t.Fatalf("paginated request required: %+v", f.inputs)
+	}
 }
 func (f *bucketFake) GetBucketLocation(context.Context, *s3.GetBucketLocationInput, ...func(*s3.Options)) (*s3.GetBucketLocationOutput, error) {
 	if f.deny {

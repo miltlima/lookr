@@ -23,7 +23,7 @@ func collectBuckets(ctx context.Context, c bucketAPI, regional func(string) buck
 	s.Region = "global"
 	var result []model.Resource
 	var warnings []error
-	in := &s3.ListBucketsInput{}
+	in := &s3.ListBucketsInput{MaxBuckets: aws.Int32(1000)}
 	for {
 		o, e := c.ListBuckets(ctx, in)
 		if e != nil {
