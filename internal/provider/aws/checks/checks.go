@@ -63,7 +63,7 @@ func Run(r model.Resource, now time.Time) []model.Finding {
 			add("s3.public_access_not_blocked", model.SeverityHigh, "bucket does not have all public access blocks enabled", "Enable all public access blocks after checking required public access")
 		}
 	case "aws.iam.user":
-		if r.Bool("has_console_password") && !r.Bool("mfa_enabled") {
+		if r.Bool("has_console_password") && falseValue("mfa_enabled") {
 			add("iam.user_no_mfa", model.SeverityHigh, "console user does not have MFA enabled", "Enable MFA for this console user")
 		}
 		if r.Int("oldest_active_key_age_days") > AccessKeyMaxAgeDays {

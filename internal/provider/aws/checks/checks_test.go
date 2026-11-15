@@ -148,6 +148,15 @@ func TestRunNeverNil(t *testing.T) {
 	}
 }
 
+func TestUnknownMFADoesNotImplyDisabled(t *testing.T) {
+	r := model.Resource{Type: "aws.iam.user", Config: map[string]any{"has_console_password": true}}
+	for _, f := range Run(r, testNow) {
+		if f.Check == "iam.user_no_mfa" {
+			t.Fatal("missing MFA information must not imply disabled MFA")
+		}
+	}
+}
+
 func TestWasteRecommendationPerType(t *testing.T) {
 	for _, typ := range []string{"ec2.instance", "ebs.volume", "ebs.snapshot", "ec2.eip", "ec2.natgateway", "elb.loadbalancer", "rds.instance", "rds.cluster", "elasticache.cluster", "eks.cluster", "lambda.function", "dynamodb.table", "sqs.queue", "cloudfront.distribution", "s3.bucket"} {
 		r := model.Resource{Type: "aws." + typ, Usage: model.Usage{Verdict: model.VerdictIdle}}
