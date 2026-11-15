@@ -3,7 +3,14 @@ package collect
 import (
 	"context"
 	"fmt"
+	"github.com/aws/aws-sdk-go-v2/service/acm"
+	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
+	"github.com/aws/aws-sdk-go-v2/service/eks"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
+	"github.com/aws/aws-sdk-go-v2/service/lambda"
+	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"sort"
+	"time"
 
 	"lookr/internal/model"
 
@@ -31,6 +38,31 @@ type Collector struct {
 
 func All() []Collector {
 	return []Collector{
+		{"aws.lambda.function", "lambda", false, func(ctx context.Context, c aws.Config, s Scope) ([]model.Resource, error) {
+			return collectFunctions(ctx, lambda.NewFromConfig(c), s)
+		}},
+		{"aws.eks.cluster", "eks", false, func(ctx context.Context, c aws.Config, s Scope) ([]model.Resource, error) {
+			return collectClusters(ctx, eks.NewFromConfig(c), ec2.NewFromConfig(c), s)
+		}},
+		{"aws.cloudfront.distribution", "cloudfront", true, func(ctx context.Context, c aws.Config, s Scope) ([]model.Resource, error) {
+			return collectDistributions(ctx, cloudfront.NewFromConfig(c), s)
+		}},
+		{"aws.acm.certificate", "acm", false, func(ctx context.Context, c aws.Config, s Scope) ([]model.Resource, error) {
+			return collectCertificates(ctx, acm.NewFromConfig(c), s)
+		}},
+		{"aws.route53.hostedzone", "route53", true, func(ctx context.Context, c aws.Config, s Scope) ([]model.Resource, error) {
+			return collectHostedZones(ctx, route53.NewFromConfig(c), s)
+		}},
+		{"aws.iam.user", "iam", true, func(ctx context.Context, c aws.Config, s Scope) ([]model.Resource, error) {
+			return collectUsers(ctx, iam.NewFromConfig(c), s, time.Now())
+		}},
+		{"aws.iam.group", "iam", true, func(ctx context.Context, c aws.Config, s Scope) ([]model.Resource, error) {
+			return collectGroups(ctx, iam.NewFromConfig(c), s)
+		}},
+		{"aws.iam.role", "iam", true, func(ctx context.Context, c aws.Config, s Scope) ([]model.Resource, error) {
+			return collectRoles(ctx, iam.NewFromConfig(c), s)
+		}},
+
 		{"aws.rds.instance", "rds", false, func(ctx context.Context, c aws.Config, s Scope) ([]model.Resource, error) {
 			return collectDBInstances(ctx, rds.NewFromConfig(c), s)
 		}},
