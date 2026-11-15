@@ -6,6 +6,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/acm"
 	"github.com/aws/aws-sdk-go-v2/service/acm/types"
+	"slices"
 	"testing"
 )
 
@@ -17,6 +18,30 @@ type acmFake struct {
 	ListCertificatesFn       func(*acm.ListCertificatesInput) (*acm.ListCertificatesOutput, error)
 	DescribeCertificateFn    func(*acm.DescribeCertificateInput) (*acm.DescribeCertificateOutput, error)
 	ListTagsForCertificateFn func(*acm.ListTagsForCertificateInput) (*acm.ListTagsForCertificateOutput, error)
+}
+
+func TestCertificateInventoryIncludesAllKeyTypesAndOrigins(t *testing.T) {
+	f := acmFake{}
+	f.ListCertificatesFn = func(in *acm.ListCertificatesInput) (*acm.ListCertificatesOutput, error) {
+		if in.Includes == nil {
+			return &acm.ListCertificatesOutput{}, nil
+		}
+		for _, key := range []types.KeyAlgorithm{"RSA_1024", "RSA_2048", "RSA_3072", "RSA_4096", "EC_prime256v1", "EC_secp384r1", "EC_secp521r1"} {
+			if !slices.Contains(in.Includes.KeyTypes, key) {
+				return &acm.ListCertificatesOutput{}, nil
+			}
+		}
+		for _, origin := range []types.CertificateKeyPairOrigin{"AWS_MANAGED", "CUSTOMER_PROVIDED", "ACME"} {
+			if !slices.Contains(in.CertificateKeyPairOrigins, origin) {
+				return &acm.ListCertificatesOutput{}, nil
+			}
+		}
+		return &acm.ListCertificatesOutput{CertificateSummaryList: []types.CertificateSummary{{CertificateArn: aws.String("arn:c")}}}, nil
+	}
+	r, err := collectCertificates(context.Background(), f, Scope{})
+	if err != nil || len(r) != 1 {
+		t.Fatalf("nondefault certificates omitted: %v %v", r, err)
+	}
 }
 
 func (f acmFake) ListCertificates(_ context.Context, in *acm.ListCertificatesInput, _ ...func(*acm.Options)) (*acm.ListCertificatesOutput, error) {

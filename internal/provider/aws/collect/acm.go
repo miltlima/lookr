@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/acm"
+	"github.com/aws/aws-sdk-go-v2/service/acm/types"
 	"lookr/internal/model"
 	"time"
 )
@@ -17,7 +18,9 @@ type certificateAPI interface {
 
 func collectCertificates(ctx context.Context, c certificateAPI, s Scope) ([]model.Resource, error) {
 	var result []model.Resource
-	in := &acm.ListCertificatesInput{}
+	// Defaults omit non-RSA and ACME certificates; inventory every supported
+	// key algorithm and key-pair origin explicitly.
+	in := &acm.ListCertificatesInput{Includes: &types.Filters{KeyTypes: types.KeyAlgorithm("").Values()}, CertificateKeyPairOrigins: types.CertificateKeyPairOrigin("").Values()}
 	for {
 		o, e := c.ListCertificates(ctx, in)
 		if e != nil {
