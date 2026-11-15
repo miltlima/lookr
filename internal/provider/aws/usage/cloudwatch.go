@@ -33,6 +33,7 @@ type metricQuery struct {
 // Any retrieval failure remains attached to its resource, even across batches.
 func Fetch(ctx context.Context, api cloudWatchAPI, reqs []Request, start, end time.Time) map[string]Result {
 	results := make(map[string]Result, len(reqs))
+	missingGroups := map[string]map[string]bool{}
 	var queries []metricQuery
 	for _, req := range reqs {
 		if _, ok := results[req.ResourceKey]; !ok {
@@ -131,6 +132,10 @@ func Fetch(ctx context.Context, api cloudWatchAPI, reqs []Request, start, end ti
 			}
 			values := points[q.id]
 			if len(values) == 0 && !q.query.ZeroIfMissing {
+				if missingGroups[q.resource] == nil {
+					missingGroups[q.resource] = map[string]bool{}
+				}
+				missingGroups[q.resource][q.query.Key] = true
 				continue
 			}
 			var value float64
@@ -147,7 +152,16 @@ func Fetch(ctx context.Context, api cloudWatchAPI, reqs []Request, start, end ti
 			if q.query.Stat == "Average" && len(values) > 0 {
 				value /= float64(len(values))
 			}
-			results[q.resource].Metrics[q.query.Key] = value
+			if q.query.Stat == "Sum" {
+				results[q.resource].Metrics[q.query.Key] += value
+			} else {
+				results[q.resource].Metrics[q.query.Key] = value
+			}
+		}
+	}
+	for resource, keys := range missingGroups {
+		for key := range keys {
+			delete(results[resource].Metrics, key)
 		}
 	}
 	return results

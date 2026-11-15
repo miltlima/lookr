@@ -27,7 +27,7 @@ func TestConfigurationChecks(t *testing.T) {
 		{"volume encryption", "ebs.volume", "ebs.unencrypted", map[string]any{"encrypted": false}, map[string]any{"encrypted": true}, model.SeverityMedium},
 		{"database encryption", "rds.instance", "rds.unencrypted", map[string]any{"storage_encrypted": false}, map[string]any{"storage_encrypted": true}, model.SeverityMedium},
 		{"database backup", "rds.instance", "rds.no_backups", map[string]any{"backup_retention_days": 0}, map[string]any{"backup_retention_days": 1}, model.SeverityMedium},
-		{"imds", "ec2.instance", "ec2.imdsv1", map[string]any{"imds_v2_required": false}, map[string]any{"imds_v2_required": true}, model.SeverityMedium},
+		{"imds", "ec2.instance", "ec2.imdsv1", map[string]any{"imds_v2_required": false, "imds_endpoint_enabled": true}, map[string]any{"imds_v2_required": true, "imds_endpoint_enabled": true}, model.SeverityMedium},
 		{"access key", "iam.user", "iam.access_key_old", map[string]any{"oldest_active_key_age_days": 91}, map[string]any{"oldest_active_key_age_days": 90}, model.SeverityMedium},
 		{"http", "cloudfront.distribution", "cloudfront.http_allowed", map[string]any{"viewer_protocol_policy": "allow-all"}, map[string]any{"viewer_protocol_policy": "redirect-to-https"}, model.SeverityMedium},
 		{"tls", "cloudfront.distribution", "cloudfront.old_tls", map[string]any{"min_tls_version": "TLSv1.1_2016"}, map[string]any{"min_tls_version": "TLSv1.2_2021"}, model.SeverityMedium},

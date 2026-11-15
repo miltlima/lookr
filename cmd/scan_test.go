@@ -56,6 +56,14 @@ func TestScanDefaults(t *testing.T) {
 		t.Fatalf("%s %+v %v", out, p, err)
 	}
 }
+
+func TestFinalScanNoMetricsFlag(t *testing.T) {
+	p := &fakeProvider{}
+	_, _, err := runScan(t, p, "--no-metrics", "--cost", "none")
+	if err != nil || !p.options.SkipMetrics {
+		t.Fatal("metric opt-out not passed", err, p.options)
+	}
+}
 func TestScanParsesLists(t *testing.T) {
 	p := &fakeProvider{}
 	_, _, err := runScan(t, p, "--regions", " us-east-1, sa-east-1 ", "--type", " ec2, ebs ", "--profile", "test")

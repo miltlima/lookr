@@ -32,6 +32,11 @@ func collectQueues(ctx context.Context, c queueAPI, s Scope) ([]model.Resource, 
 			number := func(key string) int { v, _ := strconv.Atoi(a[key]); return v }
 			id := url[strings.LastIndex(url, "/")+1:]
 			r := resource(s, "aws.sqs.queue", "sqs", id, "", nil, map[string]any{"url": url, "fifo": strings.HasSuffix(id, ".fifo"), "visibility_timeout_s": number("VisibilityTimeout"), "approximate_messages": number("ApproximateNumberOfMessages"), "retention_s": number("MessageRetentionPeriod"), "encrypted": a["SqsManagedSseEnabled"] == "true" || a["KmsMasterKeyId"] != "", "has_dlq": a["RedrivePolicy"] != ""})
+			_, hasSSE := a["SqsManagedSseEnabled"]
+			_, hasKMS := a["KmsMasterKeyId"]
+			if !hasSSE && !hasKMS {
+				delete(r.Config, "encrypted")
+			}
 			r.ARN = a["QueueArn"]
 			if tc, ok := c.(queueTagAPI); ok {
 				tagged, err := tc.ListQueueTags(ctx, &sqs.ListQueueTagsInput{QueueUrl: aws.String(url)})

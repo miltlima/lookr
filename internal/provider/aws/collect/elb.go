@@ -2,6 +2,7 @@ package collect
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -24,12 +25,17 @@ type elbAPI interface {
 }
 
 func collectLoadBalancers(ctx context.Context, api elbv2API, classic elbAPI, s Scope) ([]model.Resource, error) {
-	out := []model.Resource{}
+	modern, modernErr := collectV2LoadBalancers(ctx, api, s)
+	legacy, legacyErr := collectClassicLoadBalancers(ctx, classic, s)
+	return append(modern, legacy...), errors.Join(modernErr, legacyErr)
+}
+func collectV2LoadBalancers(ctx context.Context, api elbv2API, s Scope) ([]model.Resource, error) {
+	var out []model.Resource
 	pager := v2.NewDescribeLoadBalancersPaginator(api, &v2.DescribeLoadBalancersInput{})
 	for pager.HasMorePages() {
 		page, e := pager.NextPage(ctx)
 		if e != nil {
-			return nil, e
+			return out, e
 		}
 		for _, x := range page.LoadBalancers {
 			count := 0
@@ -37,12 +43,12 @@ func collectLoadBalancers(ctx context.Context, api elbv2API, classic elbAPI, s S
 			for groups.HasMorePages() {
 				gp, e := groups.NextPage(ctx)
 				if e != nil {
-					return nil, e
+					return out, e
 				}
 				for _, g := range gp.TargetGroups {
 					h, e := api.DescribeTargetHealth(ctx, &v2.DescribeTargetHealthInput{TargetGroupArn: g.TargetGroupArn})
 					if e != nil {
-						return nil, e
+						return out, e
 					}
 					count += len(h.TargetHealthDescriptions)
 				}
@@ -50,7 +56,7 @@ func collectLoadBalancers(ctx context.Context, api elbv2API, classic elbAPI, s S
 			tags := map[string]string{}
 			tp, e := api.DescribeTags(ctx, &v2.DescribeTagsInput{ResourceArns: []string{aws.ToString(x.LoadBalancerArn)}})
 			if e != nil {
-				return nil, e
+				return out, e
 			}
 			for _, d := range tp.TagDescriptions {
 				for _, t := range d.Tags {
@@ -69,17 +75,22 @@ func collectLoadBalancers(ctx context.Context, api elbv2API, classic elbAPI, s S
 			out = append(out, r)
 		}
 	}
+	return out, nil
+}
+
+func collectClassicLoadBalancers(ctx context.Context, classic elbAPI, s Scope) ([]model.Resource, error) {
+	var out []model.Resource
 	cp := v1.NewDescribeLoadBalancersPaginator(classic, &v1.DescribeLoadBalancersInput{})
 	for cp.HasMorePages() {
 		page, e := cp.NextPage(ctx)
 		if e != nil {
-			return nil, e
+			return out, e
 		}
 		for _, x := range page.LoadBalancerDescriptions {
 			tags := map[string]string{}
 			tp, e := classic.DescribeTags(ctx, &v1.DescribeTagsInput{LoadBalancerNames: []string{aws.ToString(x.LoadBalancerName)}})
 			if e != nil {
-				return nil, e
+				return out, e
 			}
 			for _, d := range tp.TagDescriptions {
 				for _, t := range d.Tags {

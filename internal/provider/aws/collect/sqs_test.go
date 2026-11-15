@@ -54,6 +54,16 @@ func TestCollectQueues(t *testing.T) {
 	}
 }
 
+func TestMissingQueueEncryptionStaysUnknown(t *testing.T) {
+	r, err := collectQueues(context.Background(), &queueFake{t: t}, Scope{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := r[0].Config["encrypted"]; ok {
+		t.Fatal("absent encryption attributes became a false observation")
+	}
+}
+
 type taggedQueueFake struct{ queueFake }
 
 func (*taggedQueueFake) ListQueueTags(context.Context, *sqs.ListQueueTagsInput, ...func(*sqs.Options)) (*sqs.ListQueueTagsOutput, error) {

@@ -238,11 +238,11 @@ func TestSparseAndContract(t *testing.T) {
 		keys                 []string
 		fn                   func(context.Context, *fakeEC2, Scope) ([]model.Resource, error)
 	}{
-		{"aws.ec2.instance", "ec2", "i-sparse", "instance", []string{"instance_type", "state", "platform", "private_ip", "public_ip", "image_id", "vpc_id", "security_groups", "iam_instance_profile", "imds_v2_required"}, func(c context.Context, f *fakeEC2, s Scope) ([]model.Resource, error) {
+		{"aws.ec2.instance", "ec2", "i-sparse", "instance", []string{"instance_type", "state", "platform", "private_ip", "public_ip", "image_id", "vpc_id", "security_groups", "iam_instance_profile"}, func(c context.Context, f *fakeEC2, s Scope) ([]model.Resource, error) {
 			return collectInstances(c, f, s)
 		}},
-		{"aws.ebs.volume", "ebs", "vol-sparse", "volume", []string{"size_gb", "volume_type", "iops", "throughput", "encrypted", "state", "attached_instance_id", "attached_instance_state"}, func(c context.Context, f *fakeEC2, s Scope) ([]model.Resource, error) { return collectVolumes(c, f, s) }},
-		{"aws.ebs.snapshot", "snapshot", "snap-sparse", "snapshot", []string{"volume_id", "volume_size_gb", "state", "encrypted", "description", "storage_tier", "source_volume_exists", "used_by_ami"}, func(c context.Context, f *fakeEC2, s Scope) ([]model.Resource, error) {
+		{"aws.ebs.volume", "ebs", "vol-sparse", "volume", []string{"size_gb", "volume_type", "iops", "throughput", "state", "attached_instance_id", "attached_instance_state", "attachment_count"}, func(c context.Context, f *fakeEC2, s Scope) ([]model.Resource, error) { return collectVolumes(c, f, s) }},
+		{"aws.ebs.snapshot", "snapshot", "snap-sparse", "snapshot", []string{"volume_id", "volume_size_gb", "state", "description", "storage_tier", "source_volume_exists", "used_by_ami"}, func(c context.Context, f *fakeEC2, s Scope) ([]model.Resource, error) {
 			return collectSnapshots(c, f, s)
 		}},
 		{"aws.ec2.eip", "eip", "eipalloc-1", "elastic-ip", []string{"public_ip", "allocation_id", "association_id", "instance_id", "network_interface_id"}, func(c context.Context, f *fakeEC2, s Scope) ([]model.Resource, error) {
@@ -296,7 +296,7 @@ func TestWorldOpenPorts(t *testing.T) {
 		})
 	}
 }
-func TestErrorsDiscardPartialResults(t *testing.T) {
+func TestErrorsPreserveCompletedResources(t *testing.T) {
 	ctx := context.Background()
 	s := Scope{}
 	for _, m := range []string{"Instances", "Volumes", "Snapshots", "NatGateways", "SecurityGroups", "Images"} {
@@ -315,7 +315,7 @@ func TestErrorsDiscardPartialResults(t *testing.T) {
 		case "SecurityGroups":
 			r, e = collectSecurityGroups(ctx, f, s)
 		}
-		if e == nil || r != nil {
+		if e == nil || (m == "Images" && r != nil) || (m != "Images" && len(r) == 0) {
 			t.Fatalf("%s: %v %v", m, r, e)
 		}
 	}

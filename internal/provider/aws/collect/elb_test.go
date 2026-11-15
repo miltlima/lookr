@@ -84,13 +84,13 @@ func TestCollectLoadBalancers(t *testing.T) {
 func TestLoadBalancerErrors(t *testing.T) {
 	for _, m := range []string{"DescribeLoadBalancers", "DescribeTargetGroups", "DescribeTargetHealth", "DescribeTags"} {
 		r, e := collectLoadBalancers(context.Background(), fakeV2{fail: m}, fakeV1{}, Scope{})
-		if e == nil || r != nil {
+		if e == nil || len(r) != 3 {
 			t.Fatalf("%s: %v %v", m, r, e)
 		}
 	}
 	for _, m := range []string{"DescribeLoadBalancers", "DescribeTags"} {
 		r, e := collectLoadBalancers(context.Background(), fakeV2{}, fakeV1{fail: m}, Scope{})
-		if e == nil || r != nil {
+		if e == nil || len(r) != 3 {
 			t.Fatalf("classic %s: %v %v", m, r, e)
 		}
 	}

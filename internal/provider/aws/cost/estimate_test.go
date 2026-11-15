@@ -159,3 +159,15 @@ func TestEstimateMatchesDatabaseEdition(t *testing.T) {
 		}
 	}
 }
+
+func TestFinalStoppedRDSRetainsStorageWithoutCompute(t *testing.T) {
+	p := &fakePrices{}
+	r := model.Resource{Type: "aws.rds.instance", Region: "us-east-1", Config: map[string]any{"status": "stopped", "engine": "postgres", "instance_class": "db.t3.small", "storage_type": "gp3", "allocated_storage_gb": 100}}
+	Estimate(context.Background(), &r, nil, 30, p)
+	if r.Cost.MonthlyUSD == nil || *r.Cost.MonthlyUSD != 10 || r.Cost.Source != model.CostEstimate || !strings.Contains(r.Cost.Note, "restart") {
+		t.Fatalf("stopped compute billed: %+v", r.Cost)
+	}
+	if len(p.queries) != 1 || p.queries[0].Filters["productFamily"] != "Database Storage" {
+		t.Fatal(p.queries)
+	}
+}

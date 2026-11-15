@@ -172,6 +172,11 @@ func Run(ctx context.Context, d Deps, o provider.ScanOptions) (model.Report, err
 	}
 	sort.Strings(metricRegions)
 	metrics := map[string]usage.Result{}
+	if o.SkipMetrics {
+		metricRegions = nil
+	} else if len(metricRegions) > 0 {
+		fmt.Fprintln(o.Progress, "CloudWatch: querying usage metrics (charges may apply; --no-metrics disables metrics)")
+	}
 	for _, region := range metricRegions {
 		if err := ctx.Err(); err != nil {
 			return model.Report{}, err

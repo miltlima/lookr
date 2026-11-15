@@ -32,6 +32,15 @@ func collectDBInstances(ctx context.Context, c dbInstanceAPI, s Scope) ([]model.
 				port = int(aws.ToInt32(d.Endpoint.Port))
 			}
 			r := resource(s, "aws.rds.instance", "rds", aws.ToString(d.DBInstanceIdentifier), "", tags, map[string]any{"engine": aws.ToString(d.Engine), "engine_version": aws.ToString(d.EngineVersion), "instance_class": aws.ToString(d.DBInstanceClass), "status": aws.ToString(d.DBInstanceStatus), "multi_az": aws.ToBool(d.MultiAZ), "storage_type": aws.ToString(d.StorageType), "allocated_storage_gb": int(aws.ToInt32(d.AllocatedStorage)), "az": aws.ToString(d.AvailabilityZone), "port": port, "cluster_id": aws.ToString(d.DBClusterIdentifier), "publicly_accessible": aws.ToBool(d.PubliclyAccessible), "storage_encrypted": aws.ToBool(d.StorageEncrypted), "backup_retention_days": int(aws.ToInt32(d.BackupRetentionPeriod))})
+			if d.StorageEncrypted == nil {
+				delete(r.Config, "storage_encrypted")
+			}
+			if d.BackupRetentionPeriod == nil {
+				delete(r.Config, "backup_retention_days")
+			}
+			if d.PubliclyAccessible == nil {
+				delete(r.Config, "publicly_accessible")
+			}
 			r.ARN = aws.ToString(d.DBInstanceArn)
 			r.CreatedAt = d.InstanceCreateTime
 			result = append(result, r)

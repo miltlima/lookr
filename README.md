@@ -21,6 +21,7 @@ lookr scan
 lookr scan --profile production --regions us-east-1,sa-east-1 --type ec2,ebs,rds
 lookr scan --days 14 --cost estimate --output json --out-file inventory.json
 lookr scan --cost none --output csv > inventory.csv
+lookr scan --cost none --no-metrics --output json
 ```
 
 Former per-service commands such as `lookr ec2` are replaced by `lookr scan --type ec2`.
@@ -35,6 +36,7 @@ Former per-service commands such as `lookr ec2` are replaced by `lookr scan --ty
 | `--cost` | `auto` | `auto`, `estimate`, or `none` |
 | `--profile` | credential chain | AWS shared configuration profile |
 | `--concurrency` | `8` | Maximum regions collected concurrently |
+| `--no-metrics` | `false` | Disable CloudWatch usage queries and their charges |
 
 Progress and warnings go to stderr; stdout contains only the report. Failed services/regions produce warnings while the scan continues, retaining partial resources where available. Argument errors, credential failures, and cancellation return a nonzero status. Completed scans with warnings return zero. Press Ctrl-C to cancel.
 
@@ -68,7 +70,7 @@ Global inventory runs once regardless of selected regions. These 19 short names 
 
 The terminal table shows totals, idle/orphan cost, verdicts, cost sources, issue counts, and recommendations. Resources are sorted by verdict and decreasing cost.
 
-JSON schema version `"1"` includes `generated_at`, `provider`, `account_id`, `window_days`, `regions`, `summary`, `resources`, and `warnings`. Resources contain identity, tags, creation time when available, service-specific `config`, `usage` (verdict, reason, window and metrics), `cost`, and `findings`. Missing cost is `null`, never an invented zero. Empty collections are arrays/objects. Summary includes monthly and waste costs, verdict counts, and finding counts by severity.
+JSON schema version `"1"` includes `generated_at`, `provider`, `account_id`, `window_days`, `regions`, `summary`, `resources`, and `warnings`. Resources contain identity, tags, creation time when available, service-specific `config`, `usage` (verdict, reason, window and metrics), `cost`, and `findings`. Missing cost is `null`, never an invented zero. Unknown security configuration fields are omitted rather than represented as disabled controls. Empty collections are arrays/objects. Summary includes monthly and waste costs, verdict counts, and finding counts by severity.
 
 CSV has one row per resource:
 
@@ -86,7 +88,7 @@ The last four columns contain JSON. Summary and warnings are omitted from CSV; w
 | `unknown` | Missing evidence, failed metrics, or too new to evaluate |
 | `not_evaluated` | Inventory only; no usage rule |
 
-Resources younger than seven days are `unknown` when creation time is available. Successful empty CloudWatch counters count as zero; failed/incomplete queries do not. Missing gauges such as CPU and connections remain unknown. Check dependencies and infrequent workloads before acting.
+Resources with usage rules and younger than seven days are `unknown` when creation time is available. Successful empty CloudWatch counters count as zero; failed/incomplete queries do not. Missing gauges such as CPU and connections remain unknown. ElastiCache sums metrics across known nodes; missing node data prevents idle. Multi-Attach EBS volumes require every attached instance to be known stopped before idle. ALB redirects and fixed responses count as activity without targets. Check dependencies and infrequent workloads before acting.
 
 ## Costs and limitations
 
@@ -98,13 +100,13 @@ Resources younger than seven days are `unknown` when creation time is available.
 
 `--cost auto` tries actual EC2 Compute cost, then estimates resources without actual cost. The [resource-cost API requires an EC2 Compute filter](https://docs.aws.amazon.com/aws-cost-management/latest/APIReference/API_GetCostAndUsageWithResources.html). Resource-level data must be enabled in the payer account and covers 14 days; data may be delayed. Failures produce one fallback warning. Other resource types use estimates. This is a projection, not a future invoice.
 
-Each paginated Cost Explorer request to the primary billing view [costs $0.01](https://aws.amazon.com/aws-cost-management/aws-cost-explorer/pricing/). The scan reports its request count. Use `--cost estimate` to avoid Cost Explorer calls, or `--cost none` to skip cost calculations. CloudWatch GetMetricData also has usage charges; metrics are batched up to 500 queries, including with `--cost none`.
+Each paginated Cost Explorer request to the primary billing view [costs $0.01](https://aws.amazon.com/aws-cost-management/aws-cost-explorer/pricing/). The scan reports its request count. Use `--cost estimate` to avoid Cost Explorer calls, or `--cost none` to skip cost calculations. CloudWatch GetMetricData also has usage charges; metrics are batched up to 500 queries. Use `--no-metrics` to disable these calls independently. Metric-dependent verdicts stay unknown without evidence; inventory, local checks and structural verdicts still run. `--cost none --no-metrics` disables both paid analysis paths.
 
 Estimates exclude Reserved Instances, Savings Plans, Spot discounts, free tier, and data transfer. Capacity uses 730 hours/month; measured usage is normalized to 30 days. When multiple dimensions match, the lowest positive on-demand rate is selected, so licensing and tiered prices can differ from the bill. Read each cost `note`:
 
 - EBS excludes extra IOPS/throughput; snapshots assume full source volume size.
 - NAT data processing and ELB capacity units are excluded.
-- RDS excludes backups and I/O. Cluster storage is unpriced; member instances are priced separately.
+- RDS excludes backups and I/O. Stopped instances exclude compute and retain applicable storage; RDS can automatically restart them after up to seven days, so this stopped run rate is not a month-long forecast. Cluster storage is unpriced; member instances are priced separately.
 - EKS uses the fixed standard control-plane fee, excluding nodes and extended support. Route53 includes the zone fee only.
 - Provisioned DynamoDB excludes storage. On-demand DynamoDB, SQS, and CloudFront are unpriced. Lambda uses requests and duration.
 - S3 estimates Standard storage only. Empty buckets can be idle; nonempty buckets remain `unknown` because access metrics are not enabled by default.

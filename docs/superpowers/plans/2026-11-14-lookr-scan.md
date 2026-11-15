@@ -1,6 +1,8 @@
 # lookr scan Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Implemented and verified on 2026-11-15.** All 13 tasks completed. Final review added `--no-metrics` (independent paid CloudWatch opt-out), node-specific ElastiCache metrics, Multi-Attach-safe EBS rules, targetless ALB activity checks, stopped-RDS storage-only estimates, preserved partial inventories and missing security facts. These corrections supersede conflicting original details below. See `docs/superpowers/reports/2026-11-15-scan-verification.md` for validation and remaining nonblocking limits.
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Substituir os 14 comandos do `lookr` por `lookr scan`, que varre uma conta AWS e devolve, por recurso, configuração, veredito de uso, custo mensal e achados de configuração, em tabela, JSON ou CSV.
 
@@ -174,7 +176,7 @@ type Report struct {
 func NewReport(provider, accountID string, windowDays int, regions []string, resources []Resource, warnings []Warning, now time.Time) Report
 ```
 
-- [ ] **Step 1: Criar o branch e limpar o que sai**
+- [x] **Step 1: Criar o branch e limpar o que sai**
 
 ```bash
 git checkout -b feat/scan
@@ -183,7 +185,7 @@ git rm -q cmd/aws_*.go && git rm -qf deps/regions.go
 
 Reduzir `main.go` a `cmd.Execute()` com saída 1 em erro (mensagem em stderr); `cmd/root.go` mantém só o `rootCmd` com `Use: "lookr"`, `SilenceUsage: true`. Em `go.mod`: `go 1.25`; depois `go mod tidy` (remove SDK v1 e tablewriter).
 
-- [ ] **Step 2: Escrever os testes que falham**
+- [x] **Step 2: Escrever os testes que falham**
 
 `report_test.go`:
 
@@ -210,15 +212,15 @@ func TestNewReportOrder(t *testing.T) {
 
 `model_test.go`: `TestAccessors` cobre `Int` com `int`, `int32`, `int64`, `float64`, chave ausente e tipo errado; `Str`, `Bool`, `Strs` com ausente e tipo errado; `Key()` == `"aws.ebs.volume|us-east-1|vol-1"`.
 
-- [ ] **Step 3: Rodar e ver falhar**
+- [x] **Step 3: Rodar e ver falhar**
 
 Run: `go test ./internal/model/...` — Expected: FAIL (símbolos indefinidos).
 
-- [ ] **Step 4: Implementar `model.go` e `report.go`**
+- [x] **Step 4: Implementar `model.go` e `report.go`**
 
 `NewReport` não altera a fatia recebida: copia, normaliza mapas e fatias nulos para vazios, ordena, calcula o resumo. Valores monetários do resumo arredondados a 2 casas.
 
-- [ ] **Step 5: Verificar e commitar**
+- [x] **Step 5: Verificar e commitar**
 
 Run: `go build ./... && go vet ./... && go test ./...` — Expected: PASS.
 
@@ -239,7 +241,7 @@ git add -A && git commit -m "feat: add scan data model and drop per-service comm
 - Consumes: `model.Report` (Task 1).
 - Produces: `func WriteJSON(w io.Writer, r model.Report) error`, `func WriteCSV(w io.Writer, r model.Report) error`, `func WriteTable(w io.Writer, r model.Report) error`.
 
-- [ ] **Step 1: Escrever os testes que falham**
+- [x] **Step 1: Escrever os testes que falham**
 
 Um relatório de exemplo construído em `sampleReport()` com: volume órfão estimado em 80.00 com um achado medium; instância ociosa `i-04f2` com nome `api-2` e custo real 61.32; RDS em uso com um achado high; role IAM sem custo; um recurso com nome `a,"b"` e tag com quebra de linha; um aviso.
 
@@ -253,11 +255,11 @@ func TestWriteTableEmpty(t *testing.T)   // relatório sem recursos: imprime cab
 
 Flag `-update` no teste regrava os arquivos de referência.
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 Run: `go test ./internal/output/...` — Expected: FAIL.
 
-- [ ] **Step 3: Implementar os três gravadores**
+- [x] **Step 3: Implementar os três gravadores**
 
 CSV, cabeçalho exato:
 `provider,account_id,region,type,id,arn,name,created_at,verdict,reason,monthly_usd,cost_source,cost_note,tags,config,metrics,findings`.
@@ -281,11 +283,11 @@ HIGH    rds  db-homolog  us-east-1  database is publicly accessible
 
 Regras: `1 region`/`N regions`; valores acima de mil com separador (`$3,482.10`); RESOURCE é `ID`, ou `ID (Name)` quando `Name` não é vazio nem igual ao `ID`, cortado em 40 caracteres com `…`; REASON cortado em 40; custo `$80.00 (est.)`, `$61.32 (actual)` ou `-`; ISSUES é a contagem ou `-`; linha `Warnings` só aparece se houver; bloco `FINDINGS` só aparece se houver, ordenado por gravidade e depois pela ordem dos recursos; percentual é 0 quando o total é 0.
 
-- [ ] **Step 4: Gerar referências, conferir à mão e rodar**
+- [x] **Step 4: Gerar referências, conferir à mão e rodar**
 
 Run: `go test ./internal/output/... -update && git diff --stat internal/output/testdata` e ler os três arquivos gerados; depois `go test ./...` — Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && git commit -m "feat: add json, csv and table writers"
@@ -331,7 +333,7 @@ func Apply(r *model.Resource, res Result, now time.Time, days int)
 
 Constantes em `thresholds.go`: `MinAgeDays = 7`, `EC2IdleCPUAvg = 2.0`, `EC2IdleCPUMax = 10.0`, `EC2IdleNetBytesPerDay = 5 << 20`.
 
-- [ ] **Step 1: Escrever os testes que falham**
+- [x] **Step 1: Escrever os testes que falham**
 
 `usage_test.go`, ordem de decisão do `Apply`:
 
@@ -350,15 +352,15 @@ func TestApplyNilCreatedAt(t *testing.T)  // CreatedAt nil não dá panic e segu
 
 `TestRulesCoverContract`: todo tipo do contrato com veredito definido tem entrada em `Rules()`; `sg`, `iam.*`, `acm`, `route53` não têm.
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 Run: `go test ./internal/provider/aws/usage/...` — Expected: FAIL.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 `Apply`, nesta ordem: sem regra → not_evaluated; `CreatedAt` a menos de `MinAgeDays` → unknown; regra com consultas e `res.Err != nil` → unknown; senão `Evaluate`. Motivos formatam a janela como `over %dd` e percentuais com uma casa.
 
-- [ ] **Step 4: Verificar e commitar**
+- [x] **Step 4: Verificar e commitar**
 
 Run: `go build ./... && go vet ./... && go test ./...` — Expected: PASS.
 
@@ -390,7 +392,7 @@ func NewCloudWatch(cfg aws.Config) cloudWatchAPI
 
 `cloudWatchAPI` tem só `GetMetricData`.
 
-- [ ] **Step 1: Escrever os testes que falham**
+- [x] **Step 1: Escrever os testes que falham**
 
 Com um fake que grava as entradas e devolve respostas programadas:
 
@@ -411,15 +413,15 @@ func TestFetchEmpty(t *testing.T)
 // reqs vazio → mapa vazio, nenhuma chamada
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 Run: `go test ./internal/provider/aws/usage/... -run Fetch` — Expected: FAIL.
 
-- [ ] **Step 3: Implementar `Fetch`**
+- [x] **Step 3: Implementar `Fetch`**
 
 Ids `q0`, `q1`, … mapeados de volta para (recurso, chave). Um recurso cujas consultas caem em lotes diferentes recebe `Err` se qualquer um dos lotes falhar. Agregação feita no cliente sobre os pontos diários.
 
-- [ ] **Step 4: Verificar e commitar**
+- [x] **Step 4: Verificar e commitar**
 
 Run: `go build ./... && go vet ./... && go test ./...` — Expected: PASS.
 
@@ -458,7 +460,7 @@ func Shorts() []string  // valores distintos de Short, ordenados
 
 Cada recurso sai com `Provider: "aws"`, `AccountID`, `Region`, `Type`, `Short`, `ID`, `ARN`, `Name`, `Tags`, `CreatedAt` (quando o serviço informa) e `Config` conforme o contrato. `Usage`, `Cost` e `Findings` ficam vazios.
 
-- [ ] **Step 1: Escrever os testes que falham**
+- [x] **Step 1: Escrever os testes que falham**
 
 Para cada coletor, uma função interna `collectX(ctx, api, scope)` testada com fake. Cada teste entrega duas páginas e um item esparso (só os campos obrigatórios) e confere quantidade, campos de identidade e as chaves de `Config` do contrato:
 
@@ -484,15 +486,15 @@ func TestAllUniqueTypes(t *testing.T)     // Type único em All(); Short não va
 func TestCollectorPropagatesError(t *testing.T) // erro da API volta como erro, com recursos nil
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 Run: `go test ./internal/provider/aws/collect/...` — Expected: FAIL.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 `go get` dos módulos `config`, `service/ec2`, `service/elasticloadbalancing`, `service/elasticloadbalancingv2` do SDK v2. Usar os paginadores do SDK. O coletor de ELB reúne v2 e clássico no mesmo tipo.
 
-- [ ] **Step 4: Verificar e commitar**
+- [x] **Step 4: Verificar e commitar**
 
 Run: `go build ./... && go vet ./... && go test ./...` — Expected: PASS.
 
@@ -513,7 +515,7 @@ git add -A && git commit -m "feat: collect EC2, EBS, network and load balancer r
 - Consumes: `Collector`, `Scope` (Task 5); Contrato por tipo.
 - Produces: coletores `aws.rds.instance`, `aws.rds.cluster`, `aws.elasticache.cluster`, `aws.dynamodb.table`, `aws.s3.bucket` (Global), `aws.sqs.queue`.
 
-- [ ] **Step 1: Escrever os testes que falham**
+- [x] **Step 1: Escrever os testes que falham**
 
 Mesmo padrão da Task 5 (duas páginas, item esparso, chaves do contrato), mais:
 
@@ -534,13 +536,13 @@ func TestCollectQueues(t *testing.T)
 // atributo ausente no mapa não dá panic
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 Run: `go test ./internal/provider/aws/collect/...` — Expected: FAIL.
 
-- [ ] **Step 3: Implementar** (`go get` de `service/rds`, `elasticache`, `dynamodb`, `s3`, `sqs`). No S3, as chamadas por bucket usam um cliente na região do bucket.
+- [x] **Step 3: Implementar** (`go get` de `service/rds`, `elasticache`, `dynamodb`, `s3`, `sqs`). No S3, as chamadas por bucket usam um cliente na região do bucket.
 
-- [ ] **Step 4: Verificar e commitar**
+- [x] **Step 4: Verificar e commitar**
 
 Run: `go build ./... && go vet ./... && go test ./...` — Expected: PASS.
 
@@ -561,7 +563,7 @@ git add -A && git commit -m "feat: collect RDS, ElastiCache, DynamoDB, S3 and SQ
 - Consumes: `Collector`, `Scope` (Task 5); Contrato por tipo.
 - Produces: coletores `aws.lambda.function`, `aws.eks.cluster`, `aws.cloudfront.distribution` (Global), `aws.iam.user`, `aws.iam.group`, `aws.iam.role` (Global), `aws.acm.certificate`, `aws.route53.hostedzone` (Global). Com esta tarefa `Shorts()` devolve os 19 valores do contrato.
 
-- [ ] **Step 1: Escrever os testes que falham**
+- [x] **Step 1: Escrever os testes que falham**
 
 Mesmo padrão, mais:
 
@@ -585,13 +587,13 @@ func TestShortsComplete(t *testing.T)
 
 O coletor de usuários recebe o relógio por parâmetro (`now time.Time` em `collectUsers`) para o teste da idade da chave.
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 Run: `go test ./internal/provider/aws/collect/...` — Expected: FAIL.
 
-- [ ] **Step 3: Implementar** (`go get` de `service/lambda`, `eks`, `cloudfront`, `iam`, `acm`, `route53`).
+- [x] **Step 3: Implementar** (`go get` de `service/lambda`, `eks`, `cloudfront`, `iam`, `acm`, `route53`).
 
-- [ ] **Step 4: Verificar e commitar**
+- [x] **Step 4: Verificar e commitar**
 
 Run: `go build ./... && go vet ./... && go test ./...` — Expected: PASS.
 
@@ -636,7 +638,7 @@ func NewPricingLookup(api pricingAPI) PriceLookup // com cache em memória, segu
 func NewPricing(cfg aws.Config) pricingAPI        // cliente sempre em us-east-1
 ```
 
-- [ ] **Step 1: Escrever os testes que falham**
+- [x] **Step 1: Escrever os testes que falham**
 
 `estimate_test.go`, com um `fakePrices` que responde por `ServiceCode` e grava as consultas:
 
@@ -667,15 +669,15 @@ func TestPricingNoProducts(t *testing.T)     // PriceList vazio → ErrNoPrice
 func TestPricingSkipsZeroPrice(t *testing.T) // dimensões com preço 0 são ignoradas; só zeros → ErrNoPrice
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 Run: `go test ./internal/provider/aws/cost/...` — Expected: FAIL.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 `go get` de `service/pricing`. Os filtros de cada estimador (códigos de serviço e atributos como `instanceType`, `operatingSystem`, `tenancy`, `preInstalledSw`, `capacitystatus`, `volumeApiName`, `databaseEngine`, `deploymentOption`) devem ser conferidos na referência atual da AWS Price List Query API antes de fixados; quando um filtro devolver mais de um produto, usar o de menor preço diferente de zero e manter a nota do contrato. EC2: `platform` vazio conta como Linux.
 
-- [ ] **Step 4: Verificar e commitar**
+- [x] **Step 4: Verificar e commitar**
 
 Run: `go build ./... && go vet ./... && go test ./...` — Expected: PASS.
 
@@ -705,7 +707,7 @@ func ApplyActual(r *model.Resource, monthlyUSD float64)  // Source actual, Note 
 func NewCostExplorer(cfg aws.Config) costExplorerAPI     // cliente em us-east-1
 ```
 
-- [ ] **Step 1: Escrever os testes que falham**
+- [x] **Step 1: Escrever os testes que falham**
 
 ```go
 func TestFetchActualProjects(t *testing.T)
@@ -719,15 +721,15 @@ func TestLookup(t *testing.T)               // casa por ARN; senão por ID; nenh
 func TestApplyActual(t *testing.T)          // arredonda a 2 casas; nota exata
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 Run: `go test ./internal/provider/aws/cost/... -run Actual` — Expected: FAIL.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 `go get` de `service/costexplorer`. Antes de fixar a requisição, conferir na referência atual de `GetCostAndUsageWithResources` se `Filter` é obrigatório e quais serviços aceita; se exigir filtro por serviço, fazer uma chamada por serviço coberto e somar em `calls`, ajustando `TestFetchActualRequest` de acordo. Registrar no comentário do arquivo o que a documentação diz.
 
-- [ ] **Step 4: Verificar e commitar**
+- [x] **Step 4: Verificar e commitar**
 
 Run: `go build ./... && go vet ./... && go test ./...` — Expected: PASS.
 
@@ -761,7 +763,7 @@ var DeprecatedLambdaRuntimes map[string]bool // conferir na página de runtimes 
 func Run(r model.Resource, now time.Time) []model.Finding
 ```
 
-- [ ] **Step 1: Escrever os testes que falham**
+- [x] **Step 1: Escrever os testes que falham**
 
 Tabela com um caso positivo e um negativo por verificação da seção "Achados de configuração" da spec, conferindo `Check`, `Severity` e que `Message` e `Recommendation` não são vazios. Bordas fixadas:
 
@@ -785,15 +787,15 @@ func TestWasteRecommendationPerType(t *testing.T)
 // "Review whether this resource is still needed"
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 Run: `go test ./internal/provider/aws/checks/...` — Expected: FAIL.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 Mensagens e recomendações em inglês, uma frase cada, no imperativo e sem prometer economia exata. Para `rds.public` usar os textos do exemplo da spec. Recomendações de desperdício dizem o que fazer com segurança (ex. volume órfão: "Create a snapshot if the data may be needed, then delete the volume").
 
-- [ ] **Step 4: Verificar e commitar**
+- [x] **Step 4: Verificar e commitar**
 
 Run: `go build ./... && go vet ./... && go test ./...` — Expected: PASS.
 
@@ -848,7 +850,7 @@ func Run(ctx context.Context, d Deps, o provider.ScanOptions) (model.Report, err
 func New() provider.Provider
 ```
 
-- [ ] **Step 1: Escrever os testes que falham**
+- [x] **Step 1: Escrever os testes que falham**
 
 Com `Deps` montado de fakes:
 
@@ -878,17 +880,17 @@ func TestRunCancel(t *testing.T)
 func TestRunDeterministic(t *testing.T)  // duas execuções com os mesmos fakes produzem Reports iguais
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 Run: `go test ./internal/provider/aws/... -run Run` — Expected: FAIL.
 
-- [ ] **Step 3: Implementar `Run` e `New`**
+- [x] **Step 3: Implementar `Run` e `New`**
 
 Ordem: conta → regiões → coleta (semáforo de `Concurrency` regiões; coletores globais uma vez) → métricas por região efetiva → `usage.Apply` → custo (`none`; ou `Actual` + `Estimate` para o que faltar) → `checks.Run` → `model.NewReport`. Uma linha de progresso por região concluída em `o.Progress`.
 
 `New()` monta `Deps` reais na hora do `Scan`: `config.LoadDefaultConfig` com `o.Profile`; `AccountID` via `sts:GetCallerIdentity`; `Regions` via `ec2:DescribeRegions` (só as habilitadas, sem `AllRegions`); `Collect` chama `c.Collect` com a configuração copiada para a região (`us-east-1` para globais); `Metrics` usa `usage.Fetch` com cliente da região. `go get` de `service/sts`.
 
-- [ ] **Step 4: Verificar e commitar**
+- [x] **Step 4: Verificar e commitar**
 
 Run: `go build ./... && go vet ./... && go test -race ./...` — Expected: PASS.
 
@@ -911,7 +913,7 @@ git add -A && git commit -m "feat: orchestrate scan across regions with partial-
 
 Flags e padrões: `--days 30`, `--regions ""`, `--type ""`, `--output table`, `--out-file ""`, `--cost auto`, `--profile ""`, `--concurrency 8`.
 
-- [ ] **Step 1: Escrever os testes que falham**
+- [x] **Step 1: Escrever os testes que falham**
 
 Com um provider falso que grava as opções e devolve um relatório fixo:
 
@@ -931,15 +933,15 @@ func TestScanProviderError(t *testing.T)  // erro do provider propagado; nada em
 func TestScanWarningsToStderr(t *testing.T) // relatório com avisos → cada um em stderr; stdout inalterado
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 Run: `go test ./cmd/...` — Expected: FAIL.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 Validar tudo e abrir o arquivo de saída antes de chamar o provider. `signal.NotifyContext` com `os.Interrupt` para cancelar a varredura. `main.go`: erro em stderr e `os.Exit(1)`; varredura concluída com avisos sai com 0.
 
-- [ ] **Step 4: Verificar de ponta a ponta**
+- [x] **Step 4: Verificar de ponta a ponta**
 
 Run: `go build -o /tmp/lookr . && /tmp/lookr scan --type foo; echo "exit=$?"` — Expected: mensagem de erro com a lista de tipos e `exit=1`.
 Run: `/tmp/lookr scan --help` — Expected: as oito flags com seus padrões.
@@ -947,7 +949,7 @@ Run: `go build ./... && go vet ./... && go test -race ./...` — Expected: PASS.
 
 Se houver credenciais AWS disponíveis, rodar também `/tmp/lookr scan --regions us-east-1 --cost estimate --output json | head -40` e registrar o resultado no relato da tarefa; sem credenciais, dizer que essa verificação não foi feita.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A && git commit -m "feat: add lookr scan command"
@@ -963,22 +965,22 @@ git add -A && git commit -m "feat: add lookr scan command"
 **Interfaces:**
 - Consumes: flags da Task 12; formato de saída das Tasks 1 e 2; lista de verificações da Task 10.
 
-- [ ] **Step 1: Reescrever o README**
+- [x] **Step 1: Reescrever o README**
 
 Em inglês, cobrindo: o que o `lookr scan` faz; instalação (`go install` e `go build -o lookr .`); uso com exemplos das três saídas; tabela das flags; tipos suportados com o `short` de cada um; significado dos cinco vereditos e das três origens de custo; lista das verificações com gravidade; limites conhecidos (estimativa ignora Reserved Instances, Savings Plans, Spot e tráfego; custo real cobre 14 dias e precisa ser ativado na conta pagadora; chamadas ao Cost Explorer custam US$ 0,01 cada e `--cost estimate` as evita; S3 fica `unknown` por falta de métrica de acesso); política IAM mínima somente leitura em JSON, com as ações que os coletores de fato chamam, mais `cloudwatch:GetMetricData`, `pricing:GetProducts`, `ce:GetCostAndUsageWithResources` e `sts:GetCallerIdentity`; aviso de que os comandos antigos (`lookr ec2` etc.) foram substituídos por `lookr scan --type ec2`.
 
-- [ ] **Step 2: Conferir a política contra o código**
+- [x] **Step 2: Conferir a política contra o código**
 
 Run: `grep -rhoE '\.(Describe|List|Get)[A-Za-z]+\(' internal/provider/aws --include='*.go' --exclude='*_test.go' | sort -u`
 Expected: toda operação listada tem ação correspondente na política do README, e a busca `grep -rnE '\.(Create|Delete|Put|Update|Modify|Terminate|Stop|Start)[A-Z][A-Za-z]+\(' internal/provider/aws --include='*.go' --exclude='*_test.go'` não devolve nada.
 
-- [ ] **Step 3: Corrigir a configuração de release**
+- [x] **Step 3: Corrigir a configuração de release**
 
 `.goreleaser.yaml`: `CG0_ENABLED=0` → `CGO_ENABLED=0`; acrescentar `version: 2` no topo e ajustar as chaves que a versão 2 renomeou. `release.yaml`: `actions/checkout@v4`, `actions/setup-go@v5` com `go-version-file: go.mod`, `goreleaser/goreleaser-action@v6`, `args: release --clean`.
 
 Run (se o `goreleaser` estiver instalado): `goreleaser check` — Expected: sem erros. Sem o binário, dizer que a checagem não foi feita.
 
-- [ ] **Step 4: Verificação final e commit**
+- [x] **Step 4: Verificação final e commit**
 
 Run: `go build ./... && go vet ./... && go test -race ./...` — Expected: PASS.
 

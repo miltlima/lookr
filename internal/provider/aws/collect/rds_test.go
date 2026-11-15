@@ -19,7 +19,7 @@ func (f *rdsFake) DescribeDBInstances(ctx context.Context, in *rds.DescribeDBIns
 	if f.fail {
 		return nil, errors.New("denied")
 	}
-	o := &rds.DescribeDBInstancesOutput{DBInstances: []types.DBInstance{{DBClusterIdentifier: aws.String("aurora"), TagList: []types.Tag{{Key: aws.String("Name"), Value: aws.String("named")}}}}}
+	o := &rds.DescribeDBInstancesOutput{DBInstances: []types.DBInstance{{DBClusterIdentifier: aws.String("aurora"), PubliclyAccessible: aws.Bool(false), StorageEncrypted: aws.Bool(false), BackupRetentionPeriod: aws.Int32(0), TagList: []types.Tag{{Key: aws.String("Name"), Value: aws.String("named")}}}}}
 	if f.calls == 1 {
 		o.Marker = aws.String("next")
 	}
@@ -74,7 +74,7 @@ func TestDataCollectorContracts(t *testing.T) {
 	clusterRows, _ := collectDBClusters(ctx, &clusterFake{}, Scope{})
 	cacheRows, _ := collectCacheClusters(ctx, &elasticacheFake{}, Scope{})
 	tableRows, _ := collectTables(ctx, &tableFake{}, Scope{})
-	queueRows, _ := collectQueues(ctx, &queueFake{t: t}, Scope{})
+	queueRows, _ := collectQueues(ctx, &queueFake{t: t, attrs: map[string]string{"SqsManagedSseEnabled": "false"}}, Scope{})
 	for _, tc := range []struct {
 		config map[string]any
 		keys   []string

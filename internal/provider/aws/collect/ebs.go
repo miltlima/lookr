@@ -7,6 +7,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 )
 
 type volumesAPI interface {
@@ -38,20 +39,23 @@ func collectVolumes(ctx context.Context, api interface {
 			}
 		}
 	}
-	out := []model.Resource{}
+	var out []model.Resource
 	pager := ec2.NewDescribeVolumesPaginator(api, &ec2.DescribeVolumesInput{})
 	for pager.HasMorePages() {
 		page, e := pager.NextPage(ctx)
 		if e != nil {
-			return nil, e
+			return out, e
 		}
 		for _, x := range page.Volumes {
 			id, state := "", ""
 			if len(x.Attachments) > 0 {
 				id = aws.ToString(x.Attachments[0].InstanceId)
-				state = states[id]
+				state = attachmentState(x.Attachments, states)
 			}
-			cfg := map[string]any{"size_gb": int(aws.ToInt32(x.Size)), "volume_type": string(x.VolumeType), "iops": int(aws.ToInt32(x.Iops)), "throughput": int(aws.ToInt32(x.Throughput)), "encrypted": aws.ToBool(x.Encrypted), "state": string(x.State), "attached_instance_id": id, "attached_instance_state": state}
+			cfg := map[string]any{"size_gb": int(aws.ToInt32(x.Size)), "volume_type": string(x.VolumeType), "iops": int(aws.ToInt32(x.Iops)), "throughput": int(aws.ToInt32(x.Throughput)), "encrypted": aws.ToBool(x.Encrypted), "state": string(x.State), "attached_instance_id": id, "attached_instance_state": state, "attachment_count": len(x.Attachments)}
+			if x.Encrypted == nil {
+				delete(cfg, "encrypted")
+			}
 			r := resource(scope, "aws.ebs.volume", "ebs", aws.ToString(x.VolumeId), "volume", tagsEC2(x.Tags), cfg)
 			r.CreatedAt = x.CreateTime
 			out = append(out, r)
@@ -90,15 +94,18 @@ func collectSnapshots(ctx context.Context, api interface {
 			}
 		}
 	}
-	out := []model.Resource{}
+	var out []model.Resource
 	pager := ec2.NewDescribeSnapshotsPaginator(api, &ec2.DescribeSnapshotsInput{OwnerIds: []string{"self"}})
 	for pager.HasMorePages() {
 		page, e := pager.NextPage(ctx)
 		if e != nil {
-			return nil, e
+			return out, e
 		}
 		for _, x := range page.Snapshots {
 			cfg := map[string]any{"volume_id": aws.ToString(x.VolumeId), "volume_size_gb": int(aws.ToInt32(x.VolumeSize)), "state": string(x.State), "encrypted": aws.ToBool(x.Encrypted), "description": aws.ToString(x.Description), "storage_tier": string(x.StorageTier), "source_volume_exists": vols[aws.ToString(x.VolumeId)], "used_by_ami": used[aws.ToString(x.SnapshotId)]}
+			if x.Encrypted == nil {
+				delete(cfg, "encrypted")
+			}
 			r := resource(scope, "aws.ebs.snapshot", "snapshot", aws.ToString(x.SnapshotId), "snapshot", tagsEC2(x.Tags), cfg)
 			r.ARN = "arn:aws:ec2:" + scope.Region + "::snapshot/" + aws.ToString(x.SnapshotId)
 			r.CreatedAt = x.StartTime
@@ -106,4 +113,28 @@ func collectSnapshots(ctx context.Context, api interface {
 		}
 	}
 	return out, nil
+}
+
+// Every attachment must be known stopped before a shared volume is idle.
+func attachmentState(attachments []types.VolumeAttachment, states map[string]string) string {
+	allStopped := len(attachments) > 0
+	active := ""
+	for _, a := range attachments {
+		state := states[aws.ToString(a.InstanceId)]
+		if state != "stopped" {
+			allStopped = false
+		}
+		if state == "running" {
+			active = "running"
+		} else if state == "pending" && active == "" {
+			active = "pending"
+		}
+	}
+	if active != "" {
+		return active
+	}
+	if allStopped {
+		return "stopped"
+	}
+	return "unknown"
 }

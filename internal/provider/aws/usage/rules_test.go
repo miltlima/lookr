@@ -35,18 +35,18 @@ func TestRules(t *testing.T) {
 		{"nat idle", "ec2.natgateway", nil, Metrics{"bytes_in": 0, "bytes_out": 0}, nil, model.VerdictIdle, "0 bytes over 30d"},
 		{"nat used", "ec2.natgateway", nil, Metrics{"bytes_in": 1}, nil, model.VerdictInUse, "1 bytes over 30d"},
 		{"gateway", "elb.loadbalancer", map[string]any{"lb_type": "gateway"}, nil, nil, model.VerdictUnknown, "no usage rule for gateway load balancers"},
-		{"elb orphan", "elb.loadbalancer", nil, nil, nil, model.VerdictOrphan, "no registered targets"},
-		{"elb idle", "elb.loadbalancer", map[string]any{"target_count": 1}, Metrics{"activity": 0}, nil, model.VerdictIdle, "0 requests over 30d"},
-		{"elb used", "elb.loadbalancer", map[string]any{"target_count": 1}, Metrics{"activity": 2}, nil, model.VerdictInUse, "2 requests over 30d"},
+		{"elb orphan", "elb.loadbalancer", map[string]any{"lb_type": "network"}, Metrics{"activity": 0}, nil, model.VerdictOrphan, "no registered targets"},
+		{"elb idle", "elb.loadbalancer", map[string]any{"target_count": 1, "lb_type": "network"}, Metrics{"activity": 0}, nil, model.VerdictIdle, "0 requests over 30d"},
+		{"elb used", "elb.loadbalancer", map[string]any{"target_count": 1, "lb_type": "network"}, Metrics{"activity": 2}, nil, model.VerdictInUse, "2 requests over 30d"},
 		{"rds stopped", "rds.instance", map[string]any{"status": "stopped"}, nil, nil, model.VerdictIdle, "instance is stopped"},
 		{"rds missing", "rds.instance", nil, nil, nil, model.VerdictUnknown, "no connection metrics"},
 		{"rds idle", "rds.instance", nil, Metrics{"conn_max": 0}, nil, model.VerdictIdle, "0 connections over 30d"},
 		{"rds used", "rds.instance", nil, Metrics{"conn_max": 14}, nil, model.VerdictInUse, "max 14 connections"},
 		{"aurora orphan", "rds.cluster", nil, nil, nil, model.VerdictOrphan, "cluster has no instances"},
 		{"aurora used", "rds.cluster", map[string]any{"member_count": 1}, Metrics{"conn_max": 14}, nil, model.VerdictInUse, "max 14 connections"},
-		{"cache missing", "elasticache.cluster", nil, Metrics{"cmds_get": 0}, nil, model.VerdictUnknown, "no command metrics"},
-		{"cache idle", "elasticache.cluster", map[string]any{"engine": "memcached"}, Metrics{"cmds_get": 0, "cmds_set": 0}, nil, model.VerdictIdle, "0 commands over 30d"},
-		{"cache used", "elasticache.cluster", nil, Metrics{"cmds_get": 1, "cmds_set": 2}, nil, model.VerdictInUse, "3 commands over 30d"},
+		{"cache missing", "elasticache.cluster", map[string]any{"cache_node_ids": []string{"0001"}}, Metrics{"cmds_get": 0}, nil, model.VerdictUnknown, "no command metrics"},
+		{"cache idle", "elasticache.cluster", map[string]any{"engine": "memcached", "cache_node_ids": []string{"0001"}}, Metrics{"cmds_get": 0, "cmds_set": 0}, nil, model.VerdictIdle, "0 commands over 30d"},
+		{"cache used", "elasticache.cluster", map[string]any{"cache_node_ids": []string{"0001"}}, Metrics{"cmds_get": 1, "cmds_set": 2}, nil, model.VerdictInUse, "3 commands over 30d"},
 		{"eks idle", "eks.cluster", nil, nil, nil, model.VerdictIdle, "no node groups, Fargate profiles or tagged instances"},
 		{"eks used", "eks.cluster", map[string]any{"tagged_instance_count": 1}, nil, nil, model.VerdictInUse, "cluster has compute resources"},
 		{"lambda idle", "lambda.function", nil, Metrics{"invocations": 0}, nil, model.VerdictIdle, "0 invocations over 30d"},
@@ -97,11 +97,11 @@ func TestQueriesFor(t *testing.T) {
 	}{
 		{"ec2.instance", nil, []string{"cpu_avg", "cpu_max", "net_in", "net_out"}, false, "InstanceId", ""},
 		{"ec2.natgateway", nil, []string{"bytes_out", "bytes_in"}, true, "NatGatewayId", ""},
-		{"elb.loadbalancer", map[string]any{"lb_type": "application", "metric_dimension": "app/x"}, []string{"activity"}, true, "LoadBalancer", ""},
+		{"elb.loadbalancer", map[string]any{"lb_type": "application", "metric_dimension": "app/x"}, []string{"activity", "redirects", "fixed_responses"}, true, "LoadBalancer", ""},
 		{"elb.loadbalancer", map[string]any{"lb_type": "network", "metric_dimension": "net/x"}, []string{"activity"}, true, "LoadBalancer", ""},
 		{"elb.loadbalancer", map[string]any{"lb_type": "classic", "metric_dimension": "classic-x"}, []string{"activity"}, true, "LoadBalancerName", ""},
 		{"rds.instance", nil, []string{"conn_max"}, false, "DBInstanceIdentifier", ""}, {"rds.cluster", nil, []string{"conn_max"}, false, "DBClusterIdentifier", ""},
-		{"elasticache.cluster", map[string]any{"engine": "memcached"}, []string{"cmds_get", "cmds_set"}, false, "CacheClusterId", ""},
+		{"elasticache.cluster", map[string]any{"engine": "memcached", "cache_node_ids": []string{"0001"}}, []string{"cmds_get", "cmds_set"}, false, "CacheClusterId", ""},
 		{"lambda.function", nil, []string{"invocations", "duration_ms"}, true, "FunctionName", ""},
 		{"dynamodb.table", nil, []string{"read_units", "write_units"}, true, "TableName", ""},
 		{"sqs.queue", nil, []string{"sent", "received"}, true, "QueueName", ""},
@@ -158,7 +158,7 @@ func TestIncompleteMetricsNeverImplyIdle(t *testing.T) {
 
 func TestQueryMetricNames(t *testing.T) {
 	for _, engine := range []string{"redis", "valkey", "memcached"} {
-		qs := QueriesFor(model.Resource{Type: "aws.elasticache.cluster", Config: map[string]any{"engine": engine}})
+		qs := QueriesFor(model.Resource{Type: "aws.elasticache.cluster", Config: map[string]any{"engine": engine, "cache_node_ids": []string{"0001"}}})
 		get, set := "GetTypeCmds", "SetTypeCmds"
 		if engine == "memcached" {
 			get, set = "CmdGet", "CmdSet"

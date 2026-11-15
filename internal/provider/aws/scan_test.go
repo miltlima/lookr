@@ -42,6 +42,33 @@ func TestRunHappyPath(t *testing.T) {
 		}
 	}
 }
+
+func TestFinalRunCanDisablePaidMetrics(t *testing.T) {
+	d := dependencies()
+	d.Collectors = []collect.Collector{{Type: "aws.lambda.function", Short: "lambda"}, {Type: "aws.ebs.volume", Short: "ebs"}}
+	d.Collect = func(_ context.Context, c collect.Collector, s collect.Scope) ([]model.Resource, error) {
+		return []model.Resource{{Type: c.Type, ID: c.Short, Region: s.Region, Config: map[string]any{"state": "available", "encrypted": false}}}, nil
+	}
+	d.Metrics = func(context.Context, string, []usage.Request, time.Time, time.Time) map[string]usage.Result {
+		t.Fatal("opt-out still called CloudWatch")
+		return nil
+	}
+	o := options()
+	o.SkipMetrics = true
+	o.CostMode = "none"
+	r, err := Run(context.Background(), d, o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, v := range r.Resources {
+		if v.Type == "aws.lambda.function" && v.Usage.Verdict != model.VerdictUnknown {
+			t.Fatal(v)
+		}
+		if v.Type == "aws.ebs.volume" && (v.Usage.Verdict != model.VerdictOrphan || len(v.Findings) == 0) {
+			t.Fatal("local inventory/checks disabled", v)
+		}
+	}
+}
 func TestRunCollectorFailureBecomesWarning(t *testing.T) {
 	d := dependencies()
 	original := d.Collect

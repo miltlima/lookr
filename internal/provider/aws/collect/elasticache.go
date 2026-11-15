@@ -13,7 +13,7 @@ type cacheAPI interface {
 
 func collectCacheClusters(ctx context.Context, c cacheAPI, s Scope) ([]model.Resource, error) {
 	var result []model.Resource
-	in := &elasticache.DescribeCacheClustersInput{}
+	in := &elasticache.DescribeCacheClustersInput{ShowCacheNodeInfo: aws.Bool(true)}
 	for {
 		o, e := c.DescribeCacheClusters(ctx, in)
 		if e != nil {
@@ -21,6 +21,13 @@ func collectCacheClusters(ctx context.Context, c cacheAPI, s Scope) ([]model.Res
 		}
 		for _, d := range o.CacheClusters {
 			r := resource(s, "aws.elasticache.cluster", "elasticache", aws.ToString(d.CacheClusterId), "", nil, map[string]any{"engine": aws.ToString(d.Engine), "engine_version": aws.ToString(d.EngineVersion), "node_type": aws.ToString(d.CacheNodeType), "num_nodes": int(aws.ToInt32(d.NumCacheNodes)), "status": aws.ToString(d.CacheClusterStatus), "replication_group_id": aws.ToString(d.ReplicationGroupId)})
+			nodes := []string{}
+			for _, n := range d.CacheNodes {
+				if id := aws.ToString(n.CacheNodeId); id != "" {
+					nodes = append(nodes, id)
+				}
+			}
+			r.Config["cache_node_ids"] = nodes
 			r.ARN = aws.ToString(d.ARN)
 			r.CreatedAt = d.CacheClusterCreateTime
 			if tc, ok := c.(cacheTagAPI); ok {

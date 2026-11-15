@@ -14,6 +14,7 @@ type ScanOptions struct {
 	Types       []string
 	CostMode    string
 	Concurrency int
+	SkipMetrics bool
 	Profile     string
 	Now         time.Time
 	Progress    io.Writer

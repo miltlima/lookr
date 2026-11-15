@@ -35,12 +35,12 @@ type securityGroupsAPI interface {
 }
 
 func collectInstances(ctx context.Context, api instancesAPI, scope Scope) ([]model.Resource, error) {
-	out := []model.Resource{}
+	var out []model.Resource
 	pager := ec2.NewDescribeInstancesPaginator(api, &ec2.DescribeInstancesInput{})
 	for pager.HasMorePages() {
 		page, e := pager.NextPage(ctx)
 		if e != nil {
-			return nil, e
+			return out, e
 		}
 		for _, x := range page.Reservations {
 			for _, x := range x.Instances {
@@ -52,7 +52,6 @@ func collectInstances(ctx context.Context, api instancesAPI, scope Scope) ([]mod
 				if x.IamInstanceProfile != nil {
 					profile = aws.ToString(x.IamInstanceProfile.Arn)
 				}
-				required := x.MetadataOptions != nil && x.MetadataOptions.HttpTokens == types.HttpTokensStateRequired
 				state := ""
 				if x.State != nil {
 					state = string(x.State.Name)
@@ -60,7 +59,15 @@ func collectInstances(ctx context.Context, api instancesAPI, scope Scope) ([]mod
 				if state == "terminated" {
 					continue
 				}
-				cfg := map[string]any{"instance_type": string(x.InstanceType), "state": state, "platform": string(x.Platform), "private_ip": aws.ToString(x.PrivateIpAddress), "public_ip": aws.ToString(x.PublicIpAddress), "image_id": aws.ToString(x.ImageId), "vpc_id": aws.ToString(x.VpcId), "security_groups": groups, "iam_instance_profile": profile, "imds_v2_required": required}
+				cfg := map[string]any{"instance_type": string(x.InstanceType), "state": state, "platform": string(x.Platform), "private_ip": aws.ToString(x.PrivateIpAddress), "public_ip": aws.ToString(x.PublicIpAddress), "image_id": aws.ToString(x.ImageId), "vpc_id": aws.ToString(x.VpcId), "security_groups": groups, "iam_instance_profile": profile}
+				if m := x.MetadataOptions; m != nil {
+					if m.HttpTokens == types.HttpTokensStateRequired || m.HttpTokens == types.HttpTokensStateOptional {
+						cfg["imds_v2_required"] = m.HttpTokens == types.HttpTokensStateRequired
+					}
+					if m.HttpEndpoint == types.InstanceMetadataEndpointStateEnabled || m.HttpEndpoint == types.InstanceMetadataEndpointStateDisabled {
+						cfg["imds_endpoint_enabled"] = m.HttpEndpoint == types.InstanceMetadataEndpointStateEnabled
+					}
+				}
 				r := resource(scope, "aws.ec2.instance", "ec2", aws.ToString(x.InstanceId), "instance", tagsEC2(x.Tags), cfg)
 				r.CreatedAt = x.LaunchTime
 				out = append(out, r)
@@ -70,10 +77,10 @@ func collectInstances(ctx context.Context, api instancesAPI, scope Scope) ([]mod
 	return out, nil
 }
 func collectAddresses(ctx context.Context, api addressesAPI, scope Scope) ([]model.Resource, error) {
-	out := []model.Resource{}
+	var out []model.Resource
 	page, e := api.DescribeAddresses(ctx, &ec2.DescribeAddressesInput{})
 	if e != nil {
-		return nil, e
+		return out, e
 	}
 	for _, x := range page.Addresses {
 		cfg := map[string]any{"public_ip": aws.ToString(x.PublicIp), "allocation_id": aws.ToString(x.AllocationId), "association_id": aws.ToString(x.AssociationId), "instance_id": aws.ToString(x.InstanceId), "network_interface_id": aws.ToString(x.NetworkInterfaceId)}
@@ -83,12 +90,12 @@ func collectAddresses(ctx context.Context, api addressesAPI, scope Scope) ([]mod
 	return out, nil
 }
 func collectNatGateways(ctx context.Context, api natGatewaysAPI, scope Scope) ([]model.Resource, error) {
-	out := []model.Resource{}
+	var out []model.Resource
 	pager := ec2.NewDescribeNatGatewaysPaginator(api, &ec2.DescribeNatGatewaysInput{})
 	for pager.HasMorePages() {
 		page, e := pager.NextPage(ctx)
 		if e != nil {
-			return nil, e
+			return out, e
 		}
 		for _, x := range page.NatGateways {
 			if x.State == types.NatGatewayStateDeleted {
@@ -103,12 +110,12 @@ func collectNatGateways(ctx context.Context, api natGatewaysAPI, scope Scope) ([
 	return out, nil
 }
 func collectSecurityGroups(ctx context.Context, api securityGroupsAPI, scope Scope) ([]model.Resource, error) {
-	out := []model.Resource{}
+	var out []model.Resource
 	pager := ec2.NewDescribeSecurityGroupsPaginator(api, &ec2.DescribeSecurityGroupsInput{})
 	for pager.HasMorePages() {
 		page, e := pager.NextPage(ctx)
 		if e != nil {
-			return nil, e
+			return out, e
 		}
 		for _, x := range page.SecurityGroups {
 			cfg := map[string]any{"vpc_id": aws.ToString(x.VpcId), "description": aws.ToString(x.Description), "ingress_rule_count": len(x.IpPermissions), "world_open_ports": worldPorts(x.IpPermissions)}

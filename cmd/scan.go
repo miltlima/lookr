@@ -20,6 +20,7 @@ var newProvider = func() provider.Provider { return awsprovider.New() }
 
 func newScanCommand() *cobra.Command {
 	var days, concurrency int
+	var skipMetrics bool
 	var regions, types, format, file, costMode, profile string
 	c := &cobra.Command{Use: "scan", Short: "Scan AWS resources for inventory, usage, cost and configuration findings", Args: cobra.NoArgs}
 	c.Flags().IntVar(&days, "days", 30, "Usage observation window in days")
@@ -30,6 +31,7 @@ func newScanCommand() *cobra.Command {
 	c.Flags().StringVar(&costMode, "cost", "auto", "Cost mode: auto, estimate, none")
 	c.Flags().StringVar(&profile, "profile", "", "AWS shared configuration profile")
 	c.Flags().IntVar(&concurrency, "concurrency", 8, "Maximum regions collected concurrently")
+	c.Flags().BoolVar(&skipMetrics, "no-metrics", false, "Disable paid CloudWatch usage queries")
 	c.RunE = func(c *cobra.Command, _ []string) (err error) {
 		if days <= 0 {
 			return fmt.Errorf("--days must be a positive integer (accepted: 1 or greater)")
@@ -64,7 +66,7 @@ func newScanCommand() *cobra.Command {
 			destination = f
 		}
 		var progress bytes.Buffer
-		o := provider.ScanOptions{Days: days, Regions: parseList(regions), Types: selected, CostMode: costMode, Concurrency: concurrency, Profile: profile, Now: time.Now().UTC(), Progress: io.MultiWriter(c.ErrOrStderr(), &progress)}
+		o := provider.ScanOptions{SkipMetrics: skipMetrics, Days: days, Regions: parseList(regions), Types: selected, CostMode: costMode, Concurrency: concurrency, Profile: profile, Now: time.Now().UTC(), Progress: io.MultiWriter(c.ErrOrStderr(), &progress)}
 		report, err := newProvider().Scan(c.Context(), o)
 		if err != nil {
 			return err

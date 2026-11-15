@@ -92,6 +92,9 @@ func Rules() map[string]Rule {
 			if r.Str("attached_instance_state") == "stopped" {
 				return model.VerdictIdle, "attached to stopped instance " + r.Str("attached_instance_id")
 			}
+			if r.Str("attached_instance_state") == "unknown" {
+				return model.VerdictUnknown, "attachment instance states unavailable"
+			}
 			return model.VerdictInUse, "attached to " + r.Str("attached_instance_id")
 		}},
 		"aws.ebs.snapshot": {Evaluate: func(r model.Resource, _ Metrics, now time.Time, days int) (model.Verdict, string) {
@@ -110,6 +113,9 @@ func Rules() map[string]Rule {
 			return activity(m, d, "bytes", "bytes_out", "bytes_in")
 		}},
 		"aws.elb.loadbalancer": {Queries: func(r model.Resource) []Query {
+			if r.Str("lb_type") == "" {
+				return nil
+			}
 			ns, metric, dim := "AWS/ApplicationELB", "RequestCount", "LoadBalancer"
 			switch r.Str("lb_type") {
 			case "gateway":
@@ -124,15 +130,37 @@ func Rules() map[string]Rule {
 			q := counter("activity", metric)
 			q.Namespace = ns
 			q.Dimensions = map[string]string{dim: r.Str("metric_dimension")}
-			return []Query{q}
+			qs := []Query{q}
+			if r.Str("lb_type") == "application" {
+				for _, spec := range []Query{counter("redirects", "HTTP_Redirect_Count"), counter("fixed_responses", "HTTP_Fixed_Response_Count")} {
+					spec.Namespace = ns
+					spec.Dimensions = map[string]string{dim: r.Str("metric_dimension")}
+					qs = append(qs, spec)
+				}
+			}
+			return qs
 		}, Evaluate: func(r model.Resource, m Metrics, _ time.Time, d int) (model.Verdict, string) {
+			if r.Str("lb_type") == "" {
+				return model.VerdictUnknown, "load balancer type unavailable"
+			}
 			if r.Str("lb_type") == "gateway" {
 				return model.VerdictUnknown, "no usage rule for gateway load balancers"
 			}
-			if r.Int("target_count") == 0 {
+			keys := []string{"activity"}
+			noun := "requests"
+			if r.Str("lb_type") == "application" {
+				keys = append(keys, "redirects", "fixed_responses")
+				noun = "requests, redirects or fixed responses"
+			}
+			verdict, reason := activity(m, d, noun, keys...)
+			if verdict != model.VerdictIdle {
+				return verdict, reason
+			}
+			// ALBs can intentionally serve fixed responses and redirects without targets.
+			if r.Int("target_count") == 0 && r.Str("lb_type") != "application" {
 				return model.VerdictOrphan, "no registered targets"
 			}
-			return activity(m, d, "requests", "activity")
+			return verdict, reason
 		}},
 		"aws.rds.instance": {Queries: queries("AWS/RDS", "DBInstanceIdentifier", gauge("conn_max", "DatabaseConnections", "Maximum")), Evaluate: database},
 		"aws.rds.cluster": {Queries: queries("AWS/RDS", "DBClusterIdentifier", gauge("conn_max", "DatabaseConnections", "Maximum")), Evaluate: func(r model.Resource, m Metrics, n time.Time, d int) (model.Verdict, string) {
@@ -146,8 +174,19 @@ func Rules() map[string]Rule {
 			if r.Str("engine") == "memcached" {
 				get, set = "CmdGet", "CmdSet"
 			}
-			return queries("AWS/ElastiCache", "CacheClusterId", gauge("cmds_get", get, "Sum"), gauge("cmds_set", set, "Sum"))(r)
-		}, Evaluate: func(_ model.Resource, m Metrics, _ time.Time, d int) (model.Verdict, string) {
+			var out []Query
+			for _, node := range r.Strs("cache_node_ids") {
+				qs := queries("AWS/ElastiCache", "CacheClusterId", gauge("cmds_get", get, "Sum"), gauge("cmds_set", set, "Sum"))(r)
+				for i := range qs {
+					qs[i].Dimensions["CacheNodeId"] = node
+				}
+				out = append(out, qs...)
+			}
+			return out
+		}, Evaluate: func(r model.Resource, m Metrics, _ time.Time, d int) (model.Verdict, string) {
+			if len(r.Strs("cache_node_ids")) == 0 || (r.Int("num_nodes") > 0 && len(r.Strs("cache_node_ids")) != r.Int("num_nodes")) {
+				return model.VerdictUnknown, "cache node inventory unavailable"
+			}
 			if _, ok := m["cmds_get"]; !ok {
 				return model.VerdictUnknown, "no command metrics"
 			}

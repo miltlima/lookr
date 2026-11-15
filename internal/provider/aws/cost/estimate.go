@@ -99,7 +99,10 @@ func Estimate(ctx context.Context, r *model.Resource, m usage.Metrics, days int,
 		if edition := databaseEdition(r.Str("engine")); edition != "" {
 			filters["databaseEdition"] = edition
 		}
-		value = price("AmazonRDS", region, filters) * HoursPerMonth
+		stopped := r.Str("status") == "stopped"
+		if !stopped {
+			value = price("AmazonRDS", region, filters) * HoursPerMonth
+		}
 		if r.Str("cluster_id") == "" && r.Float("allocated_storage_gb") > 0 {
 			storage := map[string]string{"gp2": "General Purpose", "gp3": "General Purpose-GP3", "io1": "Provisioned IOPS", "io2": "Provisioned IOPS-IO2", "standard": "Magnetic"}[r.Str("storage_type")]
 			if storage == "" {
@@ -109,6 +112,9 @@ func Estimate(ctx context.Context, r *model.Resource, m usage.Metrics, days int,
 			value += price("AmazonRDS", region, map[string]string{"productFamily": "Database Storage", "databaseEngine": engine, "deploymentOption": deployment, "volumeType": storage}) * r.Float("allocated_storage_gb")
 		}
 		note = "backups and I/O excluded"
+		if stopped {
+			note = "stopped; compute excluded until automatic restart (up to 7 days); backups and I/O excluded"
+		}
 	case "aws.rds.cluster":
 		r.Cost.Note = "instances are billed separately; cluster storage not estimated"
 		return

@@ -77,7 +77,7 @@ func Run(r model.Resource, now time.Time) []model.Finding {
 			add("ebs.gp2", model.SeverityLow, "volume uses gp2 storage", "Evaluate gp3 with equivalent IOPS and throughput before migrating")
 		}
 	case "aws.ec2.instance":
-		if falseValue("imds_v2_required") {
+		if r.Bool("imds_endpoint_enabled") && falseValue("imds_v2_required") {
 			add("ec2.imdsv1", model.SeverityMedium, "instance accepts IMDSv1", "Require IMDSv2 after verifying application compatibility")
 		}
 	case "aws.cloudfront.distribution":
