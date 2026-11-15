@@ -76,7 +76,7 @@ func collectSnapshots(ctx context.Context, api interface {
 		}
 	}
 	used := map[string]bool{}
-	ip := ec2.NewDescribeImagesPaginator(api, &ec2.DescribeImagesInput{Owners: []string{"self"}})
+	ip := ec2.NewDescribeImagesPaginator(api, &ec2.DescribeImagesInput{Owners: []string{"self"}, IncludeDisabled: aws.Bool(true)})
 	for ip.HasMorePages() {
 		page, e := ip.NextPage(ctx)
 		if e != nil {
@@ -100,6 +100,7 @@ func collectSnapshots(ctx context.Context, api interface {
 		for _, x := range page.Snapshots {
 			cfg := map[string]any{"volume_id": aws.ToString(x.VolumeId), "volume_size_gb": int(aws.ToInt32(x.VolumeSize)), "state": string(x.State), "encrypted": aws.ToBool(x.Encrypted), "description": aws.ToString(x.Description), "storage_tier": string(x.StorageTier), "source_volume_exists": vols[aws.ToString(x.VolumeId)], "used_by_ami": used[aws.ToString(x.SnapshotId)]}
 			r := resource(scope, "aws.ebs.snapshot", "snapshot", aws.ToString(x.SnapshotId), "snapshot", tagsEC2(x.Tags), cfg)
+			r.ARN = "arn:aws:ec2:" + scope.Region + "::snapshot/" + aws.ToString(x.SnapshotId)
 			r.CreatedAt = x.StartTime
 			out = append(out, r)
 		}

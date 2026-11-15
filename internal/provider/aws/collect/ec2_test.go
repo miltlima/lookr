@@ -262,7 +262,11 @@ func TestSparseAndContract(t *testing.T) {
 				t.Fatal(e)
 			}
 			x := r[len(r)-1]
-			assertContract(t, x, c.typ, c.short, c.id, "arn:aws:ec2:us-east-1:123:"+c.kind+"/"+c.id, c.keys)
+			wantARN := "arn:aws:ec2:us-east-1:123:" + c.kind + "/" + c.id
+			if c.typ == "aws.ebs.snapshot" {
+				wantARN = "arn:aws:ec2:us-east-1::snapshot/snap-sparse"
+			}
+			assertContract(t, x, c.typ, c.short, c.id, wantARN, c.keys)
 			if x.Name != c.id || len(x.Tags) != 0 {
 				t.Fatal(x)
 			}
